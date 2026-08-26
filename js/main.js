@@ -1,8 +1,7 @@
-/* Spec Check - Phase 0 spike panel logic.
-   Proves, inside CEP's Node runtime:
-     1. spawning ffmpeg/ffprobe and parsing loudness metrics
-     2. watch-folder completion detection (size stability + lock release)
-   Log lines are the spike's deliverable - they answer which signals work. */
+/* Spec Check - Phase 1 panel logic.
+   Model: every analysis computes the FULL metric set; a preset is only a
+   checklist of {metric, min?, max?} evaluated over cached measurements, so
+   switching presets re-scores instantly with no re-analysis. */
 (function () {
   "use strict";
 
@@ -16,7 +15,7 @@
     $("log").scrollTop = $("log").scrollHeight;
   }
 
-  /* ---------- Node bootstrap (spike question #0: which accessor exists) ---------- */
+  /* ---------- Node bootstrap ---------- */
 
   var nodeRequire = null;
   if (typeof cep_node !== "undefined" && cep_node.require) {
@@ -26,58 +25,91 @@
     nodeRequire = require;
     log("Node via global require (mixed context)", "ok");
   } else {
-    log("NO Node access - manifest flags not honored. Spike blocked.", "bad");
+    log("NO Node access - manifest flags not honored.", "bad");
   }
   if (!nodeRequire) return;
 
   var fs = nodeRequire("fs");
   var path = nodeRequire("path");
   var spawn = nodeRequire("child_process").spawn;
-  var proc = (typeof cep_node !== "undefined" && cep_node.process) || nodeRequire("process");
-  log("Node " + proc.version + " on " + proc.platform, "dim");
+
+  /* ---------- metric + preset definitions ---------- */
+
+  // Display order and formatting for the full metric set.
+  var METRICS = [
+    { key: "lufsI", label: "Integrated loudness", unit: " LUFS" },
+    { key: "lra", label: "Loudness range", unit: " LU" },
+    { key: "truePeak", label: "True peak", unit: " dBTP" },
+    { key: "rmsDb", label: "Overall RMS", unit: " dB" },
+    { key: "samplePeakDb", label: "Sample peak", unit: " dBFS" },
+    { key: "minMomentary", label: "Noise floor (min momentary, approx)", unit: " LUFS" },
+    { key: "headSilence", label: "Head silence", unit: " s" },
+    { key: "tailSilence", label: "Tail silence", unit: " s" },
+    { key: "sampleRateHz", label: "Sample rate", unit: " Hz", int: true },
+    { key: "bitrateKbps", label: "Bitrate", unit: " kbps", int: true },
+    { key: "channels", label: "Channels", unit: "", int: true },
+    { key: "duration", label: "Duration", unit: " s" }
+  ];
+
+  // Presets: checklists only. Unlisted metrics are shown but not judged.
+  var PRESETS = {
+    "ACX / Audible": [
+      { m: "rmsDb", min: -23, max: -18 },
+      { m: "samplePeakDb", max: -3 },
+      { m: "minMomentary", max: -60 },
+      { m: "bitrateKbps", min: 192 }
+    ],
+    "Apple Podcasts": [
+      { m: "lufsI", min: -17, max: -15 },
+      { m: "truePeak", max: -1 }
+    ],
+    "Spotify": [
+      { m: "lufsI", min: -15, max: -13 },
+      { m: "truePeak", max: -1 }
+    ],
+    "EBU R128 broadcast": [
+      { m: "lufsI", min: -23.5, max: -22.5 },
+      { m: "truePeak", max: -1 }
+    ],
+    "YouTube": [
+      { m: "lufsI", min: -15, max: -13 },
+      { m: "truePeak", max: -1 }
+    ]
+  };
+
+  /* ---------- state ---------- */
+
+  var cache = {};      // key(path|size|mtime) -> metrics
+  var results = [];    // [{path, key}] session list, newest last
+  var selectedPath = null;
+
+  function cacheKey(file, st) { return file + "|" + st.size + "|" + st.mtimeMs; }
 
   /* ---------- ffmpeg / ffprobe location ---------- */
 
-  // Raw __adobe_cep__.getSystemPath returns a file:/// URL; CSInterface.js
-  // normally strips the scheme. We call the raw API, so strip it here.
-  // (Verified live 2026-08-26: "file:///C:/Users/..." -> ENOENT without this.)
   var extDir = decodeURIComponent(
     window.__adobe_cep__.getSystemPath("extension").replace(/^file:\/{2,3}/, "")
   );
   var FF = null, FP = null;
 
   function findTools() {
-    log("extension dir: " + extDir, "dim");
     var local = path.join(extDir, "tools", "ffmpeg", "bin");
-    var localFF = path.join(local, "ffmpeg.exe");
-    // Spike diagnostics: say exactly why the bundled candidate is skipped.
-    try {
-      log("bundled ffmpeg exists on disk: " + fs.existsSync(localFF), "dim");
-    } catch (e) {
-      log("existsSync failed: " + e.message, "bad");
-    }
     var candidates = [
-      { ff: localFF, fp: path.join(local, "ffprobe.exe"), label: "bundled" },
+      { ff: path.join(local, "ffmpeg.exe"), fp: path.join(local, "ffprobe.exe"), label: "bundled" },
       { ff: "ffmpeg", fp: "ffprobe", label: "PATH" }
     ];
     var i = 0;
     function tryNext(reason) {
-      if (reason) log("candidate failed: " + reason, "dim");
+      if (reason) log("ffmpeg candidate failed: " + reason, "dim");
       if (i >= candidates.length) {
         $("ffstatus").textContent = "ffmpeg: NOT FOUND - run setup-ffmpeg.ps1";
         $("ffstatus").className = "bad";
         return;
       }
       var c = candidates[i++];
-      log("trying " + c.label + ": " + c.ff, "dim");
       var p;
-      try {
-        p = spawn(c.ff, ["-version"]);
-      } catch (e) {
-        tryNext(c.label + " spawn threw " + e.message);
-        return;
-      }
-      // A failed spawn fires BOTH error and close - only advance once.
+      try { p = spawn(c.ff, ["-version"]); }
+      catch (e) { tryNext(c.label + " spawn threw " + e.message); return; }
       var settled = false;
       var once = function (fn) {
         return function (a) { if (!settled) { settled = true; fn(a); } };
@@ -91,14 +123,11 @@
           var ver = (out.match(/ffmpeg version (\S+)/) || [])[1] || "?";
           $("ffstatus").textContent = "ffmpeg " + ver + " (" + c.label + ")";
           $("ffstatus").className = "ok";
-          log("ffmpeg found (" + c.label + "): " + c.ff, "ok");
         } else { tryNext(c.label + " exit code " + code); }
       }));
     }
     tryNext();
   }
-
-  /* ---------- run a tool, capture output ---------- */
 
   function run(cmd, args) {
     return new Promise(function (resolve, reject) {
@@ -111,24 +140,30 @@
     });
   }
 
-  /* ---------- analysis passes ---------- */
+  /* ---------- analysis ---------- */
 
   function parseEbur128(stderr) {
-    // Summary block: labels are stable, whitespace is not.
     var tail = stderr.slice(stderr.lastIndexOf("Summary:"));
     var num = function (re) {
       var m = tail.match(re);
       return m ? parseFloat(m[1]) : null;
     };
+    // Quietest momentary (400 ms) window above digital silence, from the
+    // per-frame lines: an approximation of noise floor for gaps/room tone.
+    var mm = null, re = /M:\s*(-?[\d.]+)/g, m;
+    while ((m = re.exec(stderr)) !== null) {
+      var v = parseFloat(m[1]);
+      if (v > -100 && (mm === null || v < mm)) mm = v;
+    }
     return {
       lufsI: num(/I:\s+(-?[\d.]+) LUFS/),
       lra: num(/LRA:\s+([\d.]+) LU/),
-      truePeak: num(/Peak:\s+(-?[\d.]+) dBFS/) // first Peak after Summary is true peak section
+      truePeak: num(/Peak:\s+(-?[\d.]+) dBFS/),
+      minMomentary: mm
     };
   }
 
   function parseAstats(stderr) {
-    // Use the LAST "RMS level dB" / "Peak level dB" = Overall section.
     var rms = null, peak = null, re = /(RMS|Peak) level dB:\s*(-?[\d.]+)/g, m;
     while ((m = re.exec(stderr)) !== null) {
       if (m[1] === "RMS") rms = parseFloat(m[2]);
@@ -155,25 +190,37 @@
   }
 
   function analyze(file) {
+    var st;
+    try { st = fs.statSync(file); }
+    catch (e) { log("Cannot stat " + file + ": " + e.message, "bad"); return; }
+    var key = cacheKey(file, st);
+    upsertResult(file, key);
+    if (cache[key]) {           // measure once - same file+size+mtime
+      selectedPath = file;
+      renderAll();
+      return;
+    }
     log("Analyzing " + path.basename(file) + " ...");
-    $("curfile").textContent = path.basename(file);
-    var t0 = Date.now(), metrics = { file: path.basename(file) };
+    var t0 = Date.now(), metrics = { file: path.basename(file), path: file };
 
     run(FP, ["-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file])
       .then(function (r) {
         var info = JSON.parse(r.stdout);
         var a = (info.streams || []).filter(function (s) { return s.codec_type === "audio"; })[0] || {};
-        metrics.duration = parseFloat((info.format || {}).duration) || null;
-        metrics.sampleRate = a.sample_rate ? a.sample_rate + " Hz" : "?";
-        metrics.channels = a.channels;
-        metrics.bitDepth = a.bits_per_raw_sample || a.bits_per_sample || (a.sample_fmt || "?");
-        metrics.codec = a.codec_name;
+        var f = info.format || {};
+        metrics.duration = parseFloat(f.duration) || null;
+        metrics.sampleRateHz = a.sample_rate ? parseInt(a.sample_rate, 10) : null;
+        metrics.channels = a.channels || null;
+        metrics.codec = a.codec_name || "?";
+        var br = parseInt(a.bit_rate || f.bit_rate, 10);
+        metrics.bitrateKbps = isNaN(br) ? null : Math.round(br / 1000);
         return run(FF, ["-nostats", "-i", file, "-map", "0:a:0",
           "-af", "ebur128=peak=true", "-f", "null", "-"]);
       })
       .then(function (r) {
         var e = parseEbur128(r.stderr);
-        metrics.lufsI = e.lufsI; metrics.lra = e.lra; metrics.truePeak = e.truePeak;
+        metrics.lufsI = e.lufsI; metrics.lra = e.lra;
+        metrics.truePeak = e.truePeak; metrics.minMomentary = e.minMomentary;
         return run(FF, ["-nostats", "-i", file, "-map", "0:a:0",
           "-af", "astats=measure_perchannel=none", "-f", "null", "-"]);
       })
@@ -186,64 +233,135 @@
       .then(function (r) {
         var s = parseSilence(r.stderr, metrics.duration);
         metrics.headSilence = s.headSilence; metrics.tailSilence = s.tailSilence;
-        render(metrics);
+        cache[key] = metrics;
+        selectedPath = file;
+        renderAll();
         log("Done in " + ((Date.now() - t0) / 1000).toFixed(1) + " s", "ok");
       })
       .catch(function (e) { log("Analysis failed: " + e.message, "bad"); });
   }
 
-  function render(m) {
-    var rows = [
-      ["File", m.file],
-      ["Duration", m.duration ? m.duration.toFixed(1) + " s" : "?"],
-      ["Format", m.codec + " / " + m.sampleRate + " / " + m.channels + "ch / " + m.bitDepth],
-      ["Integrated loudness", fmt(m.lufsI, " LUFS")],
-      ["Loudness range", fmt(m.lra, " LU")],
-      ["True peak", fmt(m.truePeak, " dBTP")],
-      ["Overall RMS", fmt(m.rmsDb, " dB")],
-      ["Sample peak", fmt(m.samplePeakDb, " dBFS")],
-      ["Head silence", fmt(m.headSilence, " s")],
-      ["Tail silence", fmt(m.tailSilence, " s")]
-    ];
-    var t = $("metrics");
-    while (t.firstChild) t.removeChild(t.firstChild);
-    var head = document.createElement("tr");
-    ["Metric", "Value"].forEach(function (h) {
-      var th = document.createElement("th");
-      th.textContent = h;
-      head.appendChild(th);
+  function upsertResult(file, key) {
+    for (var i = 0; i < results.length; i++) {
+      if (results[i].path === file) { results[i].key = key; return; }
+    }
+    results.push({ path: file, key: key });
+  }
+
+  /* ---------- scoring ---------- */
+
+  function activeChecks() { return PRESETS[$("preset").value] || []; }
+
+  function score(metrics) {
+    // returns {byMetric: {key: {required, pass|null}}, pass, failCount, unknown}
+    var by = {}, pass = true, fails = 0, unknown = 0;
+    activeChecks().forEach(function (c) {
+      var v = metrics ? metrics[c.m] : null;
+      var req = (c.min !== undefined && c.max !== undefined) ? c.min + " to " + c.max
+        : (c.min !== undefined) ? ">= " + c.min : "<= " + c.max;
+      var ok = null;
+      if (v !== null && v !== undefined) {
+        ok = (c.min === undefined || v >= c.min) && (c.max === undefined || v <= c.max);
+        if (!ok) { pass = false; fails++; }
+      } else { unknown++; }
+      by[c.m] = { required: req, pass: ok };
     });
+    return { byMetric: by, pass: pass, failCount: fails, unknown: unknown };
+  }
+
+  /* ---------- rendering ---------- */
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function fmtVal(def, v) {
+    if (v === null || v === undefined) return "?";
+    return (def.int ? String(Math.round(v)) : v.toFixed(1)) + def.unit;
+  }
+
+  function renderAll() {
+    renderResults();
+    renderScoreboard();
+  }
+
+  function renderResults() {
+    var t = $("results");
+    while (t.firstChild) t.removeChild(t.firstChild);
+    var head = el("tr");
+    head.appendChild(el("th", null, "File"));
+    head.appendChild(el("th", null, "Verdict"));
     t.appendChild(head);
-    rows.forEach(function (r) {
-      var tr = document.createElement("tr");
-      var name = document.createElement("td");
-      name.textContent = r[0];
-      var val = document.createElement("td");
-      val.className = "num";
-      val.textContent = r[1];
-      tr.appendChild(name);
-      tr.appendChild(val);
+    results.forEach(function (r) {
+      var m = cache[r.key];
+      var tr = el("tr", r.path === selectedPath ? "sel" : null);
+      tr.appendChild(el("td", null, path.basename(r.path)));
+      var v = el("td");
+      if (!m) {
+        v.appendChild(el("span", "chip na", "analyzing"));
+      } else {
+        var s = score(m);
+        v.appendChild(el("span", "chip " + (s.pass ? "pass" : "fail"),
+          s.pass ? "PASS" : "FAIL (" + s.failCount + ")"));
+      }
+      tr.appendChild(v);
+      tr.addEventListener("click", function () { selectedPath = r.path; renderAll(); });
       t.appendChild(tr);
     });
   }
 
-  function fmt(v, unit) { return (v === null || v === undefined) ? "?" : v.toFixed(1) + unit; }
+  function renderScoreboard() {
+    var t = $("metrics"), banner = $("verdict");
+    while (t.firstChild) t.removeChild(t.firstChild);
+    banner.className = ""; banner.textContent = "";
+    var entry = null;
+    results.forEach(function (r) { if (r.path === selectedPath) entry = r; });
+    var m = entry ? cache[entry.key] : null;
+    if (!m) return;
 
-  /* ---------- watch folder: completion detection ---------- */
+    var s = score(m);
+    banner.className = s.pass ? "pass" : "fail";
+    banner.textContent = m.file + " - " + $("preset").value + ": " +
+      (s.pass ? "PASS" : "FAIL (" + s.failCount + " of " + activeChecks().length + ")") +
+      (s.unknown ? " (" + s.unknown + " unmeasured)" : "");
+
+    var head = el("tr");
+    ["Metric", "Measured", "Required", ""].forEach(function (h) {
+      head.appendChild(el("th", null, h));
+    });
+    t.appendChild(head);
+    METRICS.forEach(function (def) {
+      var tr = el("tr");
+      var checked = s.byMetric[def.key];
+      tr.appendChild(el("td", checked ? null : "dim", def.label));
+      tr.appendChild(el("td", "num" + (checked ? "" : " dim"), fmtVal(def, m[def.key])));
+      tr.appendChild(el("td", "num dim", checked ? checked.required : ""));
+      var chipTd = el("td");
+      if (checked) {
+        if (checked.pass === null) chipTd.appendChild(el("span", "chip na", "?"));
+        else chipTd.appendChild(el("span", "chip " + (checked.pass ? "pass" : "fail"),
+          checked.pass ? "PASS" : "FAIL"));
+      }
+      tr.appendChild(chipTd);
+      t.appendChild(tr);
+    });
+  }
+
+  /* ---------- watch folder ---------- */
 
   var EXTS = { ".wav": 1, ".mp3": 1, ".mp4": 1, ".m4a": 1, ".flac": 1, ".aif": 1, ".aiff": 1 };
   var watcher = null, pollTimer = null;
   var candidates = {}; // path -> {size, stableSince, done}
 
-  function lockProbe(file) {
-    // Spike question: does an exclusive-ish open fail while AME still writes?
+  function lockFree(file) {
     try {
       var fd = fs.openSync(file, "r+");
       fs.closeSync(fd);
-      return { open: true };
-    } catch (e) {
-      return { open: false, code: e.code };
-    }
+      return true;
+    } catch (e) { return false; }
   }
 
   function poll() {
@@ -257,19 +375,10 @@
         c.size = st.size; c.stableSince = now;
         return;
       }
-      var stableMs = now - c.stableSince;
-      var lock = lockProbe(f);
-      if (stableMs >= 2000) {
-        if (!c.loggedStable) {
-          c.loggedStable = true;
-          log(path.basename(f) + ": size stable 2s (" + st.size + " bytes), exclusive open=" +
-            (lock.open ? "OK" : "BLOCKED " + lock.code), lock.open ? "ok" : "dim");
-        }
-        if (lock.open) {
-          c.done = true;
-          log(path.basename(f) + ": COMPLETE (stable + lock released)", "ok");
-          analyze(f);
-        }
+      if (now - c.stableSince >= 2000 && lockFree(f)) {
+        c.done = true;
+        log(path.basename(f) + ": complete, analyzing", "ok");
+        analyze(f);
       }
     });
   }
@@ -277,7 +386,6 @@
   function startWatch(dir) {
     stopWatch();
     try {
-      // recursive: exports usually land in per-project subfolders
       watcher = fs.watch(dir, { recursive: true }, function (evt, name) {
         if (!name) return;
         var f = path.join(dir, name);
@@ -285,16 +393,16 @@
         if (!EXTS[ext]) return;
         if (!candidates[f]) {
           candidates[f] = { size: -1, stableSince: Date.now(), done: false };
-          log("Watching new file: " + name + " (event: " + evt + ")");
+          log("New file: " + name);
         }
       });
     } catch (e) {
-      log("fs.watch failed: " + e.message + " - polling fallback needed for this path", "bad");
+      log("fs.watch failed: " + e.message, "bad");
       return;
     }
     pollTimer = setInterval(poll, 500);
     $("watchState").textContent = "watching " + dir;
-    $("btnWatch").textContent = "Stop watching";
+    $("btnWatch").textContent = "Stop";
     log("Watch started: " + dir, "ok");
   }
 
@@ -303,28 +411,56 @@
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     candidates = {};
     $("watchState").textContent = "idle";
-    $("btnWatch").textContent = "Start watching";
+    $("btnWatch").textContent = "Start";
   }
 
   /* ---------- UI wiring ---------- */
 
-  $("btnPick").addEventListener("click", function () {
-    var r = window.cep.fs.showOpenDialogEx(false, false, "Choose an audio or video file", "",
-      ["wav", "mp3", "mp4", "m4a", "flac", "aif", "aiff"]);
-    if (r.data && r.data.length) analyze(r.data[0]);
-  });
+  var STORE = "speccheck_state_v1";
 
-  $("btnBrowse").addEventListener("click", function () {
-    var r = window.cep.fs.showOpenDialogEx(false, true, "Choose folder to watch", "");
-    if (r.data && r.data.length) $("watchPath").value = r.data[0];
-  });
+  function saveState() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        preset: $("preset").value,
+        watchPath: $("watchPath").value
+      }));
+    } catch (e) {}
+  }
 
-  $("btnWatch").addEventListener("click", function () {
-    if (watcher) { stopWatch(); return; }
-    var dir = $("watchPath").value.trim();
-    if (!dir) { log("Pick a folder first", "bad"); return; }
-    startWatch(dir);
-  });
+  function initUI() {
+    var sel = $("preset");
+    Object.keys(PRESETS).forEach(function (name) {
+      var o = document.createElement("option");
+      o.value = name; o.textContent = name;
+      sel.appendChild(o);
+    });
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) {}
+    if (saved.preset && PRESETS[saved.preset]) sel.value = saved.preset;
+    if (saved.watchPath) $("watchPath").value = saved.watchPath;
 
+    sel.addEventListener("change", function () { saveState(); renderAll(); });
+
+    $("btnPick").addEventListener("click", function () {
+      var r = window.cep.fs.showOpenDialogEx(true, false, "Choose audio or video files", "",
+        ["wav", "mp3", "mp4", "m4a", "flac", "aif", "aiff"]);
+      if (r.data) r.data.forEach(analyze);
+    });
+
+    $("btnBrowse").addEventListener("click", function () {
+      var r = window.cep.fs.showOpenDialogEx(false, true, "Choose folder to watch", "");
+      if (r.data && r.data.length) { $("watchPath").value = r.data[0]; saveState(); }
+    });
+
+    $("btnWatch").addEventListener("click", function () {
+      if (watcher) { stopWatch(); return; }
+      var dir = $("watchPath").value.trim();
+      if (!dir) { log("Pick a folder first", "bad"); return; }
+      saveState();
+      startWatch(dir);
+    });
+  }
+
+  initUI();
   findTools();
 })();

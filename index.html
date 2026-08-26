@@ -25,7 +25,7 @@
   }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  input[type=text] {
+  input[type=text], select {
     flex: 1; background: var(--panel); color: var(--text);
     border: 1px solid var(--line); padding: 5px 6px; font-size: 12px;
   }
@@ -41,9 +41,25 @@
     font-size: 12px;
   }
   th { color: var(--dim); font-weight: 600; }
-  td.num { font-family: Consolas, monospace; }
+  td.num { font-family: Consolas, monospace; white-space: nowrap; }
+  td.dim { color: var(--dim); }
+  .chip {
+    display: inline-block; padding: 0 7px; font-size: 11px; font-weight: 600;
+    border-radius: 2px; color: #fff;
+  }
+  .chip.pass { background: var(--ok); }
+  .chip.fail { background: var(--bad); }
+  .chip.na { background: var(--line); color: var(--dim); }
+  #verdict {
+    margin-top: 8px; padding: 7px 10px; font-weight: 700; font-size: 13px;
+    display: none;
+  }
+  #verdict.pass { display: block; background: var(--ok); color: #fff; }
+  #verdict.fail { display: block; background: var(--bad); color: #fff; }
+  #results tr.sel td { background: #2e3138; }
+  #results tr { cursor: pointer; }
   #log {
-    margin-top: 10px; height: 170px; overflow-y: auto; background: #17181c;
+    margin-top: 10px; height: 120px; overflow-y: auto; background: #17181c;
     border: 1px solid var(--line); padding: 6px; font: 11px Consolas, monospace;
     white-space: pre-wrap;
   }
@@ -58,26 +74,26 @@
     <span id="ffstatus">ffmpeg: checking...</span>
   </div>
 
-  <h2>Analyze a file</h2>
   <div class="row">
+    <select id="preset"></select>
     <button id="btnPick" class="primary">Analyze file...</button>
-    <span id="curfile" style="color:var(--dim)"></span>
   </div>
 
   <h2>Watch folder</h2>
   <div class="row">
     <input type="text" id="watchPath" placeholder="folder to watch">
     <button id="btnBrowse">Browse...</button>
+    <button id="btnWatch" class="primary">Start</button>
   </div>
-  <div class="row">
-    <button id="btnWatch" class="primary">Start watching</button>
-    <span id="watchState" style="color:var(--dim)">idle</span>
-  </div>
+  <div class="row"><span id="watchState" style="color:var(--dim)">idle</span></div>
 
-  <h2>Measurements</h2>
-  <table id="metrics">
-    <tr><th>Metric</th><th>Value</th></tr>
+  <h2>Results</h2>
+  <table id="results">
+    <tr><th>File</th><th>Verdict</th></tr>
   </table>
+
+  <div id="verdict"></div>
+  <table id="metrics"></table>
 
   <div id="log"></div>
 
