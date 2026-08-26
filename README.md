@@ -10,18 +10,20 @@ preset numbers). Plan:
 ## How it works
 
 - Every analysis computes the **full metric set**: integrated LUFS, LRA,
-  true peak, overall RMS, sample peak, min-momentary (noise-floor
-  approximation), head/tail silence, sample rate, bitrate, channels.
+  true peak, overall RMS, sample peak, noise floor (quietest 0.5 s
+  flat-RMS window), head/tail silence, sample rate, bitrate, channels.
 - A **preset is only a checklist** of ranges over those metrics. Switching
   presets re-scores cached results instantly, with no re-analysis. Metrics
   the preset does not check still display, greyed.
-- Built-in presets: ACX/Audible, Apple Podcasts, Spotify, EBU R128,
-  YouTube. Custom presets: the gear opens an editor (name + checks with
-  min/max per metric), saved in the panel and grouped in the dropdown.
+- Built-in presets: ACX/Audible, Audible Originals, Apple Podcasts,
+  Spotify, EBU R128, YouTube. Custom presets: the gear opens an editor
+  (name + checks with min/max per metric), saved in the panel and grouped
+  in the dropdown.
 - **Check mix** renders the active sequence's audio to a temp WAV via
   Media Encoder (auto-discovered WAV system preset; range: entire /
-  in-out / work area) and analyzes it. A sequence marker named
-  "roomtone" over a silent section gives an exact noise-floor reading.
+  in-out / work area) and analyzes it. Optional: a duration sequence
+  marker named "roomtone" dragged across a silent section pins the
+  noise-floor measurement to exactly that region.
 - **Analyze file...** measures picked files directly. **Watch folder**
   (recursive) auto-analyzes every new render that lands, using
   size-stable-2s + lock-release completion detection.
@@ -41,9 +43,9 @@ Restart Premiere, then **Window > Extensions > Spec Check**.
 
 ## Known limits
 
-- Noise floor is approximated as the quietest momentary (400 ms) loudness
-  window above digital silence, not a marked room-tone region. Good enough
-  to flag ACX problems; the exact room-tone measurement comes later.
+- Noise floor is the quietest 0.5 s flat-RMS window above digital
+  silence, found automatically - the same units ACX and Audible specify.
+  It assumes the program contains at least half a second of room tone.
 - Watching stops when the panel closes (CEP panels only run while open).
 
 ## Repo

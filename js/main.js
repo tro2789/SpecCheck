@@ -290,13 +290,9 @@
         if (wa === "0") {
           evalES("SC_roomtone()").then(function (rt) {
             var parts = String(rt).split("|");
-            if (parts.length >= 2) {
-              roomtoneMap[outPath] = {
-                start: parseFloat(parts[0]),
-                dur: parseFloat(parts[1]),
-                point: parts[2] === "1"
-              };
-              log("Room-tone marker found at " + parts[0] + " s", "ok");
+            if (parts.length === 2) {
+              roomtoneMap[outPath] = { start: parseFloat(parts[0]), dur: parseFloat(parts[1]) };
+              log("Room-tone region marker found at " + parts[0] + " s", "ok");
             }
           });
         }
@@ -402,19 +398,29 @@
       .then(function (r) {
         var s = parseAstats(r.stderr);
         metrics.rmsDb = s.rmsDb; metrics.samplePeakDb = s.samplePeakDb;
+        // One pass: silence bounds on stderr, per-0.5 s RMS windows on stdout.
+        var n = Math.round((metrics.sampleRateHz || 48000) / 2);
         return run(FF, ["-nostats", "-i", file, "-map", "0:a:0",
-          "-af", "silencedetect=n=-60dB:d=1", "-f", "null", "-"]);
+          "-af", "silencedetect=n=-60dB:d=1" +
+            ",asetnsamples=n=" + n +
+            ",astats=metadata=1:reset=1:measure_perchannel=none" +
+            ",ametadata=mode=print:key=lavfi.astats.Overall.RMS_level:file=-",
+          "-f", "null", "-"]);
       })
       .then(function (r) {
         var s = parseSilence(r.stderr, metrics.duration);
         metrics.headSilence = s.headSilence; metrics.tailSilence = s.tailSilence;
-        // Noise floor from a Check-mix room-tone marker:
-        // - duration marker: exact RMS over the marked region.
-        // - point marker: quietest 0.5 s window within 2 s either side, so a
-        //   marker beside a short gap cannot pull dialog into the measurement.
-        // Otherwise the min-momentary approximation.
+        // Noise floor: quietest 0.5 s flat-RMS window in the whole program,
+        // from the pass above - no marker needed. A duration marker named
+        // "roomtone" on a Check-mix render overrides it with exact RMS over
+        // the marked region. The -100 gate skips digitally silent windows.
+        var best = null, reW = /RMS_level=(-?[\d.]+)/g, mW;
+        while ((mW = reW.exec(r.stdout)) !== null) {
+          var vW = parseFloat(mW[1]);
+          if (vW > -100 && (best === null || vW < best)) best = vW;
+        }
         var rt = roomtoneMap[file];
-        if (rt && !rt.point) {
+        if (rt) {
           return run(FF, ["-nostats", "-ss", String(rt.start), "-t", String(rt.dur),
             "-i", file, "-map", "0:a:0",
             "-af", "astats=measure_perchannel=none", "-f", "null", "-"])
@@ -423,26 +429,7 @@
               metrics.noiseFloorExact = true;
             });
         }
-        if (rt) {
-          var winStart = Math.max(0, rt.start - 2);
-          var n = Math.round((metrics.sampleRateHz || 48000) / 2);
-          return run(FF, ["-nostats", "-ss", String(winStart), "-t", "4",
-            "-i", file, "-map", "0:a:0",
-            "-af", "asetnsamples=n=" + n +
-              ",astats=metadata=1:reset=1:measure_perchannel=none" +
-              ",ametadata=mode=print:key=lavfi.astats.Overall.RMS_level:file=-",
-            "-f", "null", "-"])
-            .then(function (r2) {
-              var best = null, reW = /RMS_level=(-?[\d.]+)/g, mW;
-              while ((mW = reW.exec(r2.stdout)) !== null) {
-                var vW = parseFloat(mW[1]);
-                if (vW > -100 && (best === null || vW < best)) best = vW;
-              }
-              metrics.noiseFloor = best !== null ? best : metrics.minMomentary;
-              metrics.noiseFloorExact = best !== null;
-            });
-        }
-        metrics.noiseFloor = metrics.minMomentary;
+        metrics.noiseFloor = best !== null ? best : metrics.minMomentary;
         metrics.noiseFloorExact = false;
       })
       .then(function () {
@@ -553,7 +540,7 @@
       var row = el("div", "mrow" + (chk ? "" : " unchecked"));
       var label = def.label;
       if (def.key === "noiseFloor" && m.noiseFloor !== null && m.noiseFloor !== undefined) {
-        label += m.noiseFloorExact ? " (room tone)" : " (approx)";
+        label += m.noiseFloorExact ? " (room tone)" : " (quietest 0.5 s)";
       }
       var lab = el("span", "mlabel", label);
       lab.title = label;

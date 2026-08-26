@@ -6,8 +6,10 @@ function SC_activeSeq() {
     return String(app.project.activeSequence.name);
 }
 
-// Find a marker named "roomtone" (case/space-insensitive) on the active
-// sequence; returns "startSeconds|durationSeconds|isPointMarker" or "".
+// Find a DURATION marker named "roomtone" (case/space-insensitive) on the
+// active sequence; returns "startSeconds|durationSeconds" or "". Point
+// markers are ignored: the panel finds the quietest window automatically,
+// so a marker is only useful to pin the measurement to an exact region.
 function SC_roomtone() {
     if (!app.project || !app.project.activeSequence) return "";
     var ms = app.project.activeSequence.markers;
@@ -18,8 +20,7 @@ function SC_roomtone() {
         if (name === "roomtone") {
             var s = m.start.seconds;
             var d = m.end.seconds - s;
-            if (d <= 0.1) return s + "|2|1"; // point marker: panel searches near it
-            return s + "|" + d + "|0";
+            if (d > 0.1) return s + "|" + d;
         }
         m = ms.getNextMarker(m);
     }
