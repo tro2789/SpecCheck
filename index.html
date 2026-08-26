@@ -106,7 +106,17 @@
 
   <div class="row">
     <select id="preset" title="Delivery spec preset"></select>
-    <button id="btnPick" class="primary" disabled>Analyze file&hellip;</button>
+    <button id="btnPick" disabled>Analyze file&hellip;</button>
+  </div>
+
+  <div class="label">Check open sequence</div>
+  <div class="row">
+    <select id="range" title="Range to render">
+      <option value="0">Entire sequence</option>
+      <option value="1">In to out</option>
+      <option value="2">Work area</option>
+    </select>
+    <button id="btnCheck" class="primary" disabled>Check mix</button>
   </div>
 
   <div class="label">Watch folder</div>

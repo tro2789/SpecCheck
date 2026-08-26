@@ -31,7 +31,17 @@
 
   var fs = nodeRequire("fs");
   var path = nodeRequire("path");
+  var os = nodeRequire("os");
   var spawn = nodeRequire("child_process").spawn;
+
+  function evalES(script) {
+    return new Promise(function (resolve) {
+      window.__adobe_cep__.evalScript(script, resolve);
+    });
+  }
+  function esc(s) {
+    return String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
 
   /* ---------- metric + preset definitions ---------- */
 
@@ -156,10 +166,97 @@
           log("ffmpeg " + ver + " ready (" + c.label + ")", "ok");
           $("btnPick").disabled = false;
           $("btnWatch").disabled = false;
+          $("btnCheck").disabled = false;
         } else { tryNext(c.label + " exit code " + code); }
       }));
     }
     tryNext();
+  }
+
+  /* ---------- WAV render preset (for Check mix) ---------- */
+
+  var WAV_PRESET_KEY = "speccheck_wavpreset_v1";
+
+  // Lean version of SBE's preset scanner: find one audio-only WAV .epr in
+  // Premiere's system presets. Cached; falls back to a rescan if the cached
+  // path disappears (e.g. after a Premiere version bump).
+  function findWavPreset(forceRescan) {
+    if (!forceRescan) {
+      try {
+        var cached = JSON.parse(localStorage.getItem(WAV_PRESET_KEY));
+        if (cached && cached.path && fs.existsSync(cached.path)) return cached;
+      } catch (e) {}
+    }
+    var pf = "C:\\Program Files\\Adobe";
+    var appDir = null, bestNum = -1;
+    try {
+      fs.readdirSync(pf).forEach(function (name) {
+        var m = name.match(/^Adobe (?:Premiere Pro|Media Encoder) (\d{4})$/);
+        if (m && parseInt(m[1], 10) > bestNum) { bestNum = parseInt(m[1], 10); appDir = pf + "\\" + name; }
+      });
+    } catch (e) { return null; }
+    var root = appDir && appDir + "\\MediaIO\\systempresets";
+    if (!root || !fs.existsSync(root)) return null;
+
+    var files = [];
+    (function walk(dir) {
+      var entries;
+      try { entries = fs.readdirSync(dir); } catch (e) { return; }
+      entries.forEach(function (name) {
+        if (name === "Ingest") return;
+        var full = dir + "\\" + name;
+        var st;
+        try { st = fs.statSync(full); } catch (e) { return; }
+        if (st.isDirectory()) walk(full);
+        else if (/\.epr$/i.test(name)) files.push(full);
+      });
+    })(root);
+
+    var best = null;
+    for (var i = 0; i < files.length; i++) {
+      var head;
+      try { head = fs.readFileSync(files[i], "utf8").slice(0, 8192); } catch (e) { continue; }
+      // WAVE fourCC = 0x57415645 = 1463899717
+      if (head.indexOf("<ExporterFileType>1463899717</ExporterFileType>") < 0) continue;
+      if (!/<DoAudio>true<\/DoAudio>/.test(head)) continue;
+      if (/<DoVideo>true<\/DoVideo>/.test(head)) continue;
+      var name = ((head.match(/<PresetName>([\s\S]*?)<\/PresetName>/) || [])[1] || "").trim();
+      if (/^\(\$\$\$/.test(name)) name = name.replace(/^\(\$\$\$[^=]*=/, "").replace(/\)$/, "");
+      var p = { path: files[i], name: name || path.basename(files[i], ".epr") };
+      if (/48\s*k/i.test(p.name)) { best = p; break; } // prefer 48 kHz
+      if (!best) best = p;
+    }
+    if (best) localStorage.setItem(WAV_PRESET_KEY, JSON.stringify(best));
+    return best;
+  }
+
+  /* ---------- Check mix: render the active sequence, then analyze ---------- */
+
+  function checkMix() {
+    evalES("SC_activeSeq()").then(function (seqName) {
+      if (!seqName) { log("No active sequence in Premiere", "bad"); return; }
+      var preset = findWavPreset(false) || findWavPreset(true);
+      if (!preset) { log("No WAV system preset found - is Premiere installed under Program Files?", "bad"); return; }
+
+      var outDir = path.join(os.tmpdir(), "speccheck");
+      try { fs.mkdirSync(outDir, { recursive: true }); } catch (e) {}
+      var safe = String(seqName).replace(/[\\\/:*?"<>|]/g, "_");
+      var outPath = path.join(outDir, safe + ".wav");
+      try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); }
+      catch (e) { log("Cannot overwrite " + outPath + " (" + e.code + ")", "bad"); return; }
+
+      var wa = $("range").value;
+      var call = 'SC_renderActive("' + esc(outPath) + '","' + esc(preset.path) + '","' + esc(wa) + '")';
+      evalES(call).then(function (r) {
+        if (String(r).indexOf("ok:") !== 0) {
+          log("Render failed: " + r, "bad");
+          return;
+        }
+        log("Rendering \"" + seqName + "\" via " + preset.name + " ...", "ok");
+        candidates[outPath] = { size: -1, stableSince: Date.now(), done: false };
+        ensurePolling();
+      });
+    });
   }
 
   function run(cmd, args) {
@@ -441,10 +538,16 @@
     } catch (e) { return false; }
   }
 
+  function ensurePolling() {
+    if (!pollTimer) pollTimer = setInterval(poll, 500);
+  }
+
   function poll() {
+    var pending = 0;
     Object.keys(candidates).forEach(function (f) {
       var c = candidates[f];
       if (c.done) return;
+      pending++;
       var st;
       try { st = fs.statSync(f); } catch (e) { return; }
       var now = Date.now();
@@ -458,6 +561,11 @@
         analyze(f);
       }
     });
+    // Nothing to watch for and no folder watch active: stop ticking.
+    if (!watcher && !pending && pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
   }
 
   function startWatch(dir) {
@@ -477,16 +585,15 @@
       log("fs.watch failed: " + e.message, "bad");
       return;
     }
-    pollTimer = setInterval(poll, 500);
+    ensurePolling();
     $("btnWatch").textContent = "Stop";
     $("watchPath").disabled = true;
     log("Watch started: " + dir, "ok");
   }
 
   function stopWatch() {
+    // Keep candidates: a pending Check-mix render must still complete.
     if (watcher) { watcher.close(); watcher = null; }
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    candidates = {};
     $("btnWatch").textContent = "Start";
     $("watchPath").disabled = false;
   }
@@ -524,6 +631,8 @@
       selectedPath = this.value;
       renderAll();
     });
+
+    $("btnCheck").addEventListener("click", checkMix);
 
     $("btnPick").addEventListener("click", function () {
       var r = window.cep.fs.showOpenDialogEx(true, false, "Choose audio or video files", "",
