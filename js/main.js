@@ -42,31 +42,47 @@
   var FF = null, FP = null;
 
   function findTools() {
+    log("extension dir: " + extDir, "dim");
     var local = path.join(extDir, "tools", "ffmpeg", "bin");
+    var localFF = path.join(local, "ffmpeg.exe");
+    // Spike diagnostics: say exactly why the bundled candidate is skipped.
+    try {
+      log("bundled ffmpeg exists on disk: " + fs.existsSync(localFF), "dim");
+    } catch (e) {
+      log("existsSync failed: " + e.message, "bad");
+    }
     var candidates = [
-      { ff: path.join(local, "ffmpeg.exe"), fp: path.join(local, "ffprobe.exe") },
-      { ff: "ffmpeg", fp: "ffprobe" } // PATH fallback
+      { ff: localFF, fp: path.join(local, "ffprobe.exe"), label: "bundled" },
+      { ff: "ffmpeg", fp: "ffprobe", label: "PATH" }
     ];
     var i = 0;
-    function tryNext() {
+    function tryNext(reason) {
+      if (reason) log("candidate failed: " + reason, "dim");
       if (i >= candidates.length) {
         $("ffstatus").textContent = "ffmpeg: NOT FOUND - run setup-ffmpeg.ps1";
         $("ffstatus").className = "bad";
         return;
       }
       var c = candidates[i++];
-      var p = spawn(c.ff, ["-version"]);
+      log("trying " + c.label + ": " + c.ff, "dim");
+      var p;
+      try {
+        p = spawn(c.ff, ["-version"]);
+      } catch (e) {
+        tryNext(c.label + " spawn threw " + e.message);
+        return;
+      }
       var out = "";
       p.stdout.on("data", function (d) { out += d; });
-      p.on("error", tryNext);
+      p.on("error", function (e) { tryNext(c.label + " error " + (e.code || e.message)); });
       p.on("close", function (code) {
         if (code === 0) {
           FF = c.ff; FP = c.fp;
           var ver = (out.match(/ffmpeg version (\S+)/) || [])[1] || "?";
-          $("ffstatus").textContent = "ffmpeg " + ver + (c.ff === "ffmpeg" ? " (PATH)" : " (bundled)");
+          $("ffstatus").textContent = "ffmpeg " + ver + " (" + c.label + ")";
           $("ffstatus").className = "ok";
-          log("ffmpeg found: " + c.ff, "ok");
-        } else { tryNext(); }
+          log("ffmpeg found (" + c.label + "): " + c.ff, "ok");
+        } else { tryNext(c.label + " exit code " + code); }
       });
     }
     tryNext();
@@ -251,7 +267,8 @@
   function startWatch(dir) {
     stopWatch();
     try {
-      watcher = fs.watch(dir, function (evt, name) {
+      // recursive: exports usually land in per-project subfolders
+      watcher = fs.watch(dir, { recursive: true }, function (evt, name) {
         if (!name) return;
         var f = path.join(dir, name);
         var ext = path.extname(name).toLowerCase();
