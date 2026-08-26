@@ -1,5 +1,12 @@
 # Spec Check
 
+[![Latest release](https://img.shields.io/github/v/release/tro2789/SpecCheck)](https://github.com/tro2789/SpecCheck/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/tro2789/SpecCheck/total)](https://github.com/tro2789/SpecCheck/releases)
+[![License: MIT](https://img.shields.io/github/license/tro2789/SpecCheck)](LICENSE)
+![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078d4)
+![Premiere Pro 22.0+](https://img.shields.io/badge/Premiere%20Pro-22.0%2B-9999ff)
+[![Buy me a coffee](https://img.shields.io/badge/%E2%98%95%20buy%20me%20a%20coffee-tip-ffdd00)](https://buy.stripe.com/5kQ6oH5Lybfs2BI091bwk0d)
+
 CEP panel for Premiere Pro: measure a mix against a delivery spec (Audible/ACX,
 Apple Podcasts, Spotify, broadcast, custom) and show a pass/fail scoreboard.
 
@@ -64,6 +71,11 @@ Restart Premiere, then **Window > Extensions > Spec Check**.
 `tools/` (the ffmpeg download) is gitignored and lives only in the installed
 extension dir. ffmpeg is version-pinned (8.1.2) and downloaded with user
 consent, not bundled in the `.zxp`.
+
+## Support
+
+Spec Check is free and stays free. If it saves you a delivery round-trip,
+you can [buy me a coffee](https://buy.stripe.com/5kQ6oH5Lybfs2BI091bwk0d).
 
 ## License
 
