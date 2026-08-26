@@ -3,7 +3,8 @@
 CEP panel for Premiere Pro: measure a mix against a delivery spec (Audible/ACX,
 Apple Podcasts, Spotify, broadcast, custom) and show a pass/fail scoreboard.
 
-**Status: Phase 1** (Phase 0 spike passed 2026-08-26). Plan:
+**Status: Phase 3 feature-complete** (pending the Audible Originals
+preset numbers). Plan:
 `~/Repos/docs/plans/premiere-audio-qc-panel.md` (on the Debian VM).
 
 ## How it works
@@ -15,10 +16,19 @@ Apple Podcasts, Spotify, broadcast, custom) and show a pass/fail scoreboard.
   presets re-scores cached results instantly, with no re-analysis. Metrics
   the preset does not check still display, greyed.
 - Built-in presets: ACX/Audible, Apple Podcasts, Spotify, EBU R128,
-  YouTube. Custom presets and a QC report file come in Phase 3.
+  YouTube. Custom presets: the gear opens an editor (name + checks with
+  min/max per metric), saved in the panel and grouped in the dropdown.
+- **Check mix** renders the active sequence's audio to a temp WAV via
+  Media Encoder (auto-discovered WAV system preset; range: entire /
+  in-out / work area) and analyzes it. A sequence marker named
+  "roomtone" over a silent section gives an exact noise-floor reading.
 - **Analyze file...** measures picked files directly. **Watch folder**
   (recursive) auto-analyzes every new render that lands, using
   size-stable-2s + lock-release completion detection.
+- **Save report** writes `<file>.qc.txt` next to the analyzed file:
+  preset, checks with pass/fail, and all measurements.
+- `build.ps1` produces a signed `dist\SpecCheck-v<version>.zxp`
+  (reuses the SBE publisher cert when the sibling repo is present).
 
 ## Setup (Windows)
 

@@ -52,7 +52,7 @@
     { key: "truePeak", label: "True peak", unit: " dBTP" },
     { key: "rmsDb", label: "Overall RMS", unit: " dB" },
     { key: "samplePeakDb", label: "Sample peak", unit: " dBFS" },
-    { key: "minMomentary", label: "Noise floor (approx)", unit: " LUFS" },
+    { key: "noiseFloor", label: "Noise floor", unit: " dB" },
     { key: "headSilence", label: "Head silence", unit: " s" },
     { key: "tailSilence", label: "Tail silence", unit: " s" },
     { key: "sampleRateHz", label: "Sample rate", unit: " Hz", int: true },
@@ -62,11 +62,11 @@
   ];
 
   // Presets: checklists only. Unlisted metrics are shown but not judged.
-  var PRESETS = {
+  var BUILTIN_PRESETS = {
     "ACX / Audible": [
       { m: "rmsDb", min: -23, max: -18 },
       { m: "samplePeakDb", max: -3 },
-      { m: "minMomentary", max: -60 },
+      { m: "noiseFloor", max: -60 },
       { m: "bitrateKbps", min: 192 }
     ],
     "Apple Podcasts": [
@@ -86,6 +86,21 @@
       { m: "truePeak", max: -1 }
     ]
   };
+
+  var CUSTOM_KEY = "speccheck_custom_presets_v1";
+  var customPresets = {};
+  try { customPresets = JSON.parse(localStorage.getItem(CUSTOM_KEY)) || {}; } catch (e) {}
+
+  function saveCustom() {
+    localStorage.setItem(CUSTOM_KEY, JSON.stringify(customPresets));
+  }
+
+  function allPresets() {
+    var out = {};
+    Object.keys(BUILTIN_PRESETS).forEach(function (k) { out[k] = BUILTIN_PRESETS[k]; });
+    Object.keys(customPresets).forEach(function (k) { out[k] = customPresets[k]; });
+    return out;
+  }
 
   /* ---------- state ---------- */
 
@@ -232,6 +247,8 @@
 
   /* ---------- Check mix: render the active sequence, then analyze ---------- */
 
+  var roomtoneMap = {}; // rendered outPath -> {start, dur} of the roomtone marker
+
   function checkMix() {
     evalES("SC_activeSeq()").then(function (seqName) {
       if (!seqName) { log("No active sequence in Premiere", "bad"); return; }
@@ -253,8 +270,19 @@
           return;
         }
         log("Rendering \"" + seqName + "\" via " + preset.name + " ...", "ok");
+        delete roomtoneMap[outPath];
         candidates[outPath] = { size: -1, stableSince: Date.now(), done: false };
         ensurePolling();
+        // Room-tone marker offsets only line up for entire-sequence renders.
+        if (wa === "0") {
+          evalES("SC_roomtone()").then(function (rt) {
+            var parts = String(rt).split("|");
+            if (parts.length === 2) {
+              roomtoneMap[outPath] = { start: parseFloat(parts[0]), dur: parseFloat(parts[1]) };
+              log("Room-tone marker found at " + parts[0] + " s", "ok");
+            }
+          });
+        }
       });
     });
   }
@@ -363,6 +391,22 @@
       .then(function (r) {
         var s = parseSilence(r.stderr, metrics.duration);
         metrics.headSilence = s.headSilence; metrics.tailSilence = s.tailSilence;
+        // Noise floor: exact room-tone RMS when Check mix captured a marker
+        // region; otherwise the min-momentary approximation.
+        var rt = roomtoneMap[file];
+        if (rt) {
+          return run(FF, ["-nostats", "-ss", String(rt.start), "-t", String(rt.dur),
+            "-i", file, "-map", "0:a:0",
+            "-af", "astats=measure_perchannel=none", "-f", "null", "-"])
+            .then(function (r2) {
+              metrics.noiseFloor = parseAstats(r2.stderr).rmsDb;
+              metrics.noiseFloorExact = true;
+            });
+        }
+        metrics.noiseFloor = metrics.minMomentary;
+        metrics.noiseFloorExact = false;
+      })
+      .then(function () {
         cache[key] = metrics;
         selectedPath = file;
         renderAll();
@@ -380,7 +424,7 @@
 
   /* ---------- scoring ---------- */
 
-  function activeChecks() { return PRESETS[$("preset").value] || []; }
+  function activeChecks() { return allPresets()[$("preset").value] || []; }
 
   function score(metrics) {
     // returns {byMetric: {key: {required, pass|null}}, pass, failCount, unknown}
@@ -487,7 +531,11 @@
       var chk = s.byMetric[def.key];
       if (!chk && !showAll) { hidden++; return; }
       var row = el("div", "mrow" + (chk ? "" : " unchecked"));
-      row.appendChild(el("span", "mlabel", def.label));
+      var label = def.label;
+      if (def.key === "noiseFloor" && m.noiseFloor !== null && m.noiseFloor !== undefined) {
+        label += m.noiseFloorExact ? " (room tone)" : " (approx)";
+      }
+      row.appendChild(el("span", "mlabel", label));
       row.appendChild(el("span",
         "mval" + (chk && chk.pass === false ? " fail" : ""),
         fmtVal(def, m[def.key])));
@@ -514,6 +562,7 @@
       t.appendChild(row);
     });
 
+    var foot = el("div", "mfoot");
     var toggle = el("div", "mtoggle",
       showAll ? "Show checked only" : "Show all metrics (" + hidden + " more)");
     toggle.addEventListener("click", function () {
@@ -521,7 +570,52 @@
       saveState();
       renderScoreboard();
     });
-    t.appendChild(toggle);
+    foot.appendChild(toggle);
+    var save = el("div", "msave", "Save report");
+    save.addEventListener("click", function () { saveReport(m, s); });
+    foot.appendChild(save);
+    t.appendChild(foot);
+  }
+
+  /* ---------- QC report ---------- */
+
+  function saveReport(m, s) {
+    var lines = [];
+    lines.push("Spec Check report");
+    lines.push("File:    " + (m.path || m.file));
+    lines.push("Preset:  " + $("preset").value + " - " +
+      (s.pass ? "PASS" : "FAIL (" + s.failCount + " of " + activeChecks().length + ")"));
+    lines.push("Date:    " + new Date().toISOString());
+    lines.push("");
+    lines.push("Checks:");
+    METRICS.forEach(function (def) {
+      var chk = s.byMetric[def.key];
+      if (!chk) return;
+      lines.push("  " + pad(def.label, 22) + pad(fmtVal(def, m[def.key]), 14) +
+        pad(chk.required, 14) +
+        (chk.pass === null ? "?" : chk.pass ? "PASS" : "FAIL"));
+    });
+    lines.push("");
+    lines.push("All measurements:");
+    METRICS.forEach(function (def) {
+      lines.push("  " + pad(def.label, 22) + fmtVal(def, m[def.key]));
+    });
+    lines.push("");
+    lines.push("Generated by Spec Check for Premiere Pro");
+
+    var out = (m.path || m.file).replace(/\.[^.\\\/]+$/, "") + ".qc.txt";
+    try {
+      fs.writeFileSync(out, lines.join("\r\n"));
+      log("Report saved: " + out, "ok");
+    } catch (e) {
+      log("Could not save report: " + e.message, "bad");
+    }
+  }
+
+  function pad(str, n) {
+    str = String(str);
+    while (str.length < n) str += " ";
+    return str + " ";
   }
 
   /* ---------- watch folder ---------- */
@@ -612,16 +706,32 @@
     } catch (e) {}
   }
 
-  function initUI() {
+  function rebuildPresetSelect() {
     var sel = $("preset");
-    Object.keys(PRESETS).forEach(function (name) {
-      var o = document.createElement("option");
-      o.value = name; o.textContent = name;
-      sel.appendChild(o);
-    });
+    var current = sel.value;
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
+    var addGroup = function (labelText, names) {
+      if (!names.length) return;
+      var g = document.createElement("optgroup");
+      g.label = labelText;
+      names.forEach(function (name) {
+        var o = document.createElement("option");
+        o.value = name; o.textContent = name;
+        g.appendChild(o);
+      });
+      sel.appendChild(g);
+    };
+    addGroup("Built-in", Object.keys(BUILTIN_PRESETS));
+    addGroup("Custom", Object.keys(customPresets));
+    if (current && allPresets()[current]) sel.value = current;
+  }
+
+  function initUI() {
+    rebuildPresetSelect();
+    var sel = $("preset");
     var saved = {};
     try { saved = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) {}
-    if (saved.preset && PRESETS[saved.preset]) sel.value = saved.preset;
+    if (saved.preset && allPresets()[saved.preset]) sel.value = saved.preset;
     if (saved.watchPath) $("watchPath").value = saved.watchPath;
     if (saved.showAll) showAll = true;
 
@@ -651,6 +761,138 @@
       if (!dir) { log("Pick a folder first", "bad"); return; }
       saveState();
       startWatch(dir);
+    });
+
+    $("btnSettings").addEventListener("click", function () {
+      renderEditor();
+      $("viewMain").hidden = true;
+      $("viewSettings").hidden = false;
+    });
+    $("btnDone").addEventListener("click", function () {
+      $("viewSettings").hidden = true;
+      $("viewMain").hidden = false;
+      rebuildPresetSelect();
+      renderAll();
+    });
+    initEditor();
+  }
+
+  /* ---------- settings: custom preset editor ---------- */
+
+  // Metrics a custom preset can check, in editor order.
+  var EDITABLE = ["lufsI", "lra", "truePeak", "rmsDb", "samplePeakDb",
+    "noiseFloor", "headSilence", "tailSilence", "sampleRateHz", "bitrateKbps", "channels"];
+
+  var editing = null;          // name of the custom preset being edited, or null
+  var editChecks = [];         // working copy of its checks
+
+  function metricLabel(key) {
+    var out = key;
+    METRICS.forEach(function (d) { if (d.key === key) out = d.label; });
+    return out;
+  }
+
+  function renderEditor() {
+    var sel = $("cpSel");
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
+    var names = Object.keys(customPresets);
+    if (!names.length && editing === null) {
+      var o = el("option", null, "No custom presets yet");
+      o.disabled = true; o.selected = true;
+      sel.appendChild(o);
+    }
+    names.forEach(function (name) {
+      var o = el("option", null, name);
+      o.value = name;
+      sel.appendChild(o);
+    });
+    if (editing && customPresets[editing]) sel.value = editing;
+    $("cpName").value = editing || "";
+    renderChecks();
+  }
+
+  function renderChecks() {
+    var box = $("cpChecks");
+    while (box.firstChild) box.removeChild(box.firstChild);
+    editChecks.forEach(function (c, idx) {
+      var row = el("div", "cprow");
+      var msel = document.createElement("select");
+      EDITABLE.forEach(function (key) {
+        var o = el("option", null, metricLabel(key));
+        o.value = key;
+        msel.appendChild(o);
+      });
+      msel.value = c.m;
+      msel.addEventListener("change", function () { c.m = this.value; });
+      row.appendChild(msel);
+      var mkNum = function (field, ph) {
+        var inp = document.createElement("input");
+        inp.type = "number"; inp.step = "any"; inp.placeholder = ph;
+        if (c[field] !== undefined) inp.value = c[field];
+        inp.addEventListener("input", function () {
+          if (this.value === "") delete c[field];
+          else c[field] = parseFloat(this.value);
+        });
+        return inp;
+      };
+      row.appendChild(mkNum("min", "min"));
+      row.appendChild(mkNum("max", "max"));
+      var x = el("span", "x", "×");
+      x.title = "Remove check";
+      x.addEventListener("click", function () {
+        editChecks.splice(idx, 1);
+        renderChecks();
+      });
+      row.appendChild(x);
+      box.appendChild(row);
+    });
+  }
+
+  function initEditor() {
+    $("cpSel").addEventListener("change", function () {
+      editing = this.value;
+      editChecks = (customPresets[editing] || []).map(function (c) {
+        var copy = { m: c.m };
+        if (c.min !== undefined) copy.min = c.min;
+        if (c.max !== undefined) copy.max = c.max;
+        return copy;
+      });
+      renderEditor();
+    });
+    $("cpNew").addEventListener("click", function () {
+      editing = null;
+      editChecks = [{ m: "lufsI", min: -17, max: -15 }];
+      $("cpName").value = "";
+      renderChecks();
+      $("cpName").focus();
+    });
+    $("cpDelete").addEventListener("click", function () {
+      var name = $("cpSel").value;
+      if (!customPresets[name]) return;
+      delete customPresets[name];
+      saveCustom();
+      editing = null; editChecks = [];
+      renderEditor();
+      log("Deleted custom preset \"" + name + "\"", "ok");
+    });
+    $("cpAddCheck").addEventListener("click", function () {
+      editChecks.push({ m: "truePeak", max: -1 });
+      renderChecks();
+    });
+    $("cpSave").addEventListener("click", function () {
+      var name = $("cpName").value.trim();
+      if (!name) { log("Give the preset a name", "bad"); return; }
+      if (BUILTIN_PRESETS[name]) { log("\"" + name + "\" is a built-in name - pick another", "bad"); return; }
+      var checks = editChecks.filter(function (c) {
+        return c.m && (c.min !== undefined || c.max !== undefined);
+      });
+      if (!checks.length) { log("Add at least one check with a min or max", "bad"); return; }
+      if (editing && editing !== name) delete customPresets[editing];
+      customPresets[name] = checks;
+      saveCustom();
+      editing = name;
+      renderEditor();
+      log("Saved custom preset \"" + name + "\"", "ok");
     });
   }
 
