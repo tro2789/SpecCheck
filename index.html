@@ -68,14 +68,8 @@
   .vtext { font-size: 10px; color: var(--dim); white-space: nowrap; }
   .vtext.fail { color: var(--fail); }
 
-  /* verdict line */
-  #verdict {
-    display: none; align-items: center; gap: 7px;
-    margin: 14px 0 4px; font-weight: 600;
-  }
-  #verdict.show { display: flex; }
-
   /* scoreboard: hairline rows, range meters */
+  #metrics { margin-top: 12px; }
   #metrics .mrow {
     display: flex; align-items: center; gap: 10px;
     padding: 4px 6px; border-bottom: 1px solid var(--line);
@@ -142,7 +136,6 @@
   <div class="label">Results</div>
   <div id="results"></div>
 
-  <div id="verdict"><span class="dot" id="vdot"></span><span id="vtext"></span></div>
   <div id="metrics"></div>
 
   <div id="log"></div>

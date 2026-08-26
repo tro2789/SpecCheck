@@ -374,23 +374,14 @@
   }
 
   function renderScoreboard() {
-    var t = $("metrics"), verdict = $("verdict");
+    var t = $("metrics");
     while (t.firstChild) t.removeChild(t.firstChild);
-    verdict.className = "";
     var entry = null;
     results.forEach(function (r) { if (r.path === selectedPath) entry = r; });
     var m = entry ? cache[entry.key] : null;
     if (!m) return;
 
     var s = score(m);
-    verdict.className = "show";
-    $("vdot").className = "dot " + (s.pass ? "pass" : "fail");
-    $("vtext").textContent = s.pass
-      ? m.file + " passes " + $("preset").value
-      : m.file + ": " + s.failCount + " of " + activeChecks().length +
-        " checks failing (" + $("preset").value + ")" +
-        (s.unknown ? ", " + s.unknown + " unmeasured" : "");
-
     var hidden = 0;
     METRICS.forEach(function (def) {
       var chk = s.byMetric[def.key];
