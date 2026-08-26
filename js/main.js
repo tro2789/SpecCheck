@@ -432,7 +432,7 @@
     activeChecks().forEach(function (c) {
       var v = metrics ? metrics[c.m] : null;
       var req = (c.min !== undefined && c.max !== undefined) ? c.min + " to " + c.max
-        : (c.min !== undefined) ? ">= " + c.min : "<= " + c.max;
+        : (c.min !== undefined) ? "≥ " + c.min : "≤ " + c.max;
       var ok = null;
       if (v !== null && v !== undefined) {
         ok = (c.min === undefined || v >= c.min) && (c.max === undefined || v <= c.max);
