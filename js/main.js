@@ -34,6 +34,16 @@
   var os = nodeRequire("os");
   var spawn = nodeRequire("child_process").spawn;
 
+  // The panel also loads in Media Encoder (AME), where Premiere's
+  // ExtendScript DOM (activeSequence, app.encoder) does not exist.
+  // Check mix is Premiere-only; analyze file and watch folder are
+  // host-agnostic.
+  var isAME = false;
+  try {
+    isAME = JSON.parse(window.__adobe_cep__.getHostEnvironment()).appName === "AME";
+  } catch (e) {}
+  if (isAME) log("Host: Media Encoder (Check mix is Premiere-only)", "ok");
+
   function evalES(script) {
     return new Promise(function (resolve) {
       window.__adobe_cep__.evalScript(script, resolve);
@@ -263,6 +273,7 @@
   var roomtoneMap = {}; // rendered outPath -> {start, dur} of the roomtone marker
 
   function checkMix() {
+    if (isAME) return; // no sequence DOM in Media Encoder
     evalES("SC_activeSeq()").then(function (seqName) {
       if (!seqName) { log("No active sequence in Premiere", "bad"); return; }
       var preset = findWavPreset(false) || findWavPreset(true);
@@ -718,6 +729,11 @@
   }
 
   function initUI() {
+    if (isAME) {
+      $("range").hidden = true;
+      $("btnCheck").hidden = true;
+      $("btnPick").style.flex = "1";
+    }
     rebuildPresetSelect();
     var sel = $("preset");
     var saved = {};

@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ExtensionManifest Version="7.0" ExtensionBundleId="com.tohare.speccheck"
-    ExtensionBundleVersion="1.0.0" ExtensionBundleName="Spec Check"
+    ExtensionBundleVersion="1.1.0" ExtensionBundleName="Spec Check"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.tohare.speccheck.panel" Version="1.0.0"/>
+    <Extension Id="com.tohare.speccheck.panel" Version="1.1.0"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
       <Host Name="PPRO" Version="[22.0,99.9]"/>
+      <Host Name="AME" Version="[22.0,99.9]"/>
     </HostList>
     <LocaleList>
       <Locale Code="All"/>
