@@ -535,7 +535,9 @@
       if (def.key === "noiseFloor" && m.noiseFloor !== null && m.noiseFloor !== undefined) {
         label += m.noiseFloorExact ? " (room tone)" : " (approx)";
       }
-      row.appendChild(el("span", "mlabel", label));
+      var lab = el("span", "mlabel", label);
+      lab.title = label;
+      row.appendChild(lab);
       row.appendChild(el("span",
         "mval" + (chk && chk.pass === false ? " fail" : ""),
         fmtVal(def, m[def.key])));

@@ -24,7 +24,7 @@
   .view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .view[hidden] { display: none; }
   .label {
-    margin: 14px 0 5px; font-size: 10px; letter-spacing: .08em;
+    margin: 12px 0 5px; font-size: 10px; letter-spacing: .08em;
     text-transform: uppercase; color: var(--dim); font-weight: 600;
   }
   .row { display: flex; gap: 6px; align-items: center; }
@@ -58,12 +58,14 @@
   #resultSel { flex: 1; }
 
   /* scoreboard */
-  #metrics { margin-top: 12px; overflow-y: auto; flex: none; }
+  #metrics { margin-top: 8px; overflow-y: auto; flex: none; }
   #metrics .mrow {
     display: flex; align-items: center; gap: 10px;
-    padding: 4px 6px; border-bottom: 1px solid var(--line);
+    padding: 3px 6px; border-bottom: 1px solid var(--line);
   }
-  #metrics .mrow .mlabel { flex: 1 1 40%; }
+  #metrics .mrow .mlabel {
+    flex: 1 1 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   #metrics .mrow.unchecked .mlabel,
   #metrics .mrow.unchecked .mval { color: var(--dim); }
   .mval {
@@ -124,31 +126,30 @@
 <div class="view" id="viewMain">
   <div class="row">
     <select id="preset" title="Delivery spec preset"></select>
-    <button id="btnPick" disabled>Analyze file&hellip;</button>
     <button id="btnSettings" class="icon" title="Settings">&#9881;</button>
   </div>
 
-  <div class="label">Check open sequence</div>
+  <div class="row" style="margin-top:8px">
+    <span class="dot" id="rdot"></span><select id="resultSel"></select>
+  </div>
+
+  <div id="metrics"></div>
+
+  <div class="label">Check</div>
   <div class="row">
-    <select id="range" title="Range to render">
+    <select id="range" title="Range to render" style="flex:1">
       <option value="0">Entire sequence</option>
       <option value="1">In to out</option>
       <option value="2">Work area</option>
     </select>
     <button id="btnCheck" class="primary" disabled>Check mix</button>
+    <button id="btnPick" disabled>Analyze file&hellip;</button>
   </div>
-
-  <div class="label">Watch folder</div>
-  <div class="row">
-    <input type="text" id="watchPath" placeholder="exports land here">
+  <div class="row" style="margin-top:6px">
+    <input type="text" id="watchPath" placeholder="or watch a folder for new exports">
     <button id="btnBrowse" title="Choose folder">&hellip;</button>
     <button id="btnWatch" disabled>Start</button>
   </div>
-
-  <div class="label">Results</div>
-  <div class="row"><span class="dot" id="rdot"></span><select id="resultSel"></select></div>
-
-  <div id="metrics"></div>
 
   <div id="log"></div>
 </div>
