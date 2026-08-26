@@ -72,35 +72,12 @@
     font: 11px Consolas, monospace; white-space: nowrap;
     flex: 0 0 84px; text-align: right;
   }
+  .mval.pass { color: var(--pass); }
   .mval.fail { color: var(--fail); }
   .mreq {
     font: 10px Consolas, monospace; color: var(--dim);
-    flex: 0 0 74px; text-align: center; white-space: nowrap;
+    flex: 0 0 90px; text-align: center; white-space: nowrap;
   }
-  .meter {
-    flex: 0 0 96px; height: 8px; background: var(--inset);
-    border-radius: 2px; position: relative; overflow: hidden;
-  }
-  .meter .band {
-    position: absolute; top: 0; bottom: 0;
-    /* CEP 12 = Chromium 99: no color-mix, keep a plain rgba tint */
-    background: rgba(86, 168, 101, 0.26);
-  }
-  /* One-sided checks: the allowed zone is open-ended, so fade that edge
-     instead of stopping it hard. */
-  .meter .band.open-left {
-    background: linear-gradient(to right, rgba(86,168,101,0), rgba(86,168,101,0.26) 65%);
-  }
-  .meter .band.open-right {
-    background: linear-gradient(to left, rgba(86,168,101,0), rgba(86,168,101,0.26) 65%);
-  }
-  .meter .mark {
-    position: absolute; top: 0; bottom: 0; width: 2px;
-    transition: left .2s ease-out;
-  }
-  .meter .mark.pass { background: var(--pass); }
-  .meter .mark.fail { background: var(--fail); }
-  .meter-spacer { flex: 0 0 96px; }
   .mfoot { display: flex; }
   .mtoggle, .msave {
     padding: 5px 6px; color: var(--dim); font-size: 10px; cursor: pointer;

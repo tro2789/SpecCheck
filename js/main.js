@@ -498,25 +498,6 @@
     dot.className = "dot" + (sm ? (score(sm).pass ? " pass" : " fail") : "");
   }
 
-  // Meter window: where the track starts/ends and where the allowed band sits.
-  function meterWindow(c) {
-    if (c.min !== undefined && c.max !== undefined) {
-      var pad = (c.max - c.min) || 1;
-      return { wLo: c.min - pad, wHi: c.max + pad, bLo: c.min, bHi: c.max };
-    }
-    if (c.max !== undefined) {
-      var span = Math.max(Math.abs(c.max) * 0.5, 6);
-      return { wLo: c.max - span, wHi: c.max + span * 0.5, bLo: c.max - span, bHi: c.max };
-    }
-    var span2 = Math.max(Math.abs(c.min) * 0.5, 6);
-    return { wLo: c.min - span2 * 0.5, wHi: c.min + span2, bLo: c.min, bHi: c.min + span2 };
-  }
-
-  function pct(v, w) {
-    var p = (v - w.wLo) / (w.wHi - w.wLo) * 100;
-    return Math.max(2, Math.min(98, p));
-  }
-
   function renderScoreboard() {
     var t = $("metrics");
     while (t.firstChild) t.removeChild(t.firstChild);
@@ -538,31 +519,11 @@
       var lab = el("span", "mlabel", label);
       lab.title = label;
       row.appendChild(lab);
-      row.appendChild(el("span",
-        "mval" + (chk && chk.pass === false ? " fail" : ""),
-        fmtVal(def, m[def.key])));
+      var vcls = "mval";
+      if (chk && chk.pass === true) vcls += " pass";
+      if (chk && chk.pass === false) vcls += " fail";
+      row.appendChild(el("span", vcls, fmtVal(def, m[def.key])));
       row.appendChild(el("span", "mreq", chk ? chk.required : ""));
-      if (chk) {
-        var check = null;
-        activeChecks().forEach(function (c) { if (c.m === def.key) check = c; });
-        var v = m[def.key];
-        var meter = el("div", "meter");
-        if (check && v !== null && v !== undefined) {
-          var w = meterWindow(check);
-          var openCls = check.min === undefined ? " open-left"
-            : check.max === undefined ? " open-right" : "";
-          var band = el("div", "band" + openCls);
-          band.style.left = pct(w.bLo, w) + "%";
-          band.style.width = (pct(w.bHi, w) - pct(w.bLo, w)) + "%";
-          meter.appendChild(band);
-          var mark = el("div", "mark " + (chk.pass ? "pass" : "fail"));
-          mark.style.left = pct(v, w) + "%";
-          meter.appendChild(mark);
-        }
-        row.appendChild(meter);
-      } else {
-        row.appendChild(el("div", "meter-spacer"));
-      }
       t.appendChild(row);
     });
 

@@ -37,9 +37,11 @@ contrast (600 vs 400) does hierarchy; size stays tight.
 - Controls: flat, 1px --line border, 3px radius, --surface fill; hover
   brightens border; focus shows a 1px --accent ring; disabled drops to
   50% opacity.
-- The scoreboard is the hero: each checked metric renders a range meter,
-  a horizontal --inset track with the allowed band marked and a 2px
-  marker at the measured value (marker carries the pass/fail color).
+- The scoreboard is the hero: three columns (label, measured value,
+  required range). The measured value carries the verdict color, --pass
+  or --fail; unchecked metrics stay dim with no range. (Range meters
+  were tried and removed 2026-08-26: value color reads faster and the
+  bars cost width.)
 - Verdict line: colored dot + sentence ("Passes Apple Podcasts",
   "2 checks failing"), not a filled banner.
 - Log: --inset strip, Consolas 10px, --dim; errors in --fail.
