@@ -38,7 +38,12 @@
 
   /* ---------- ffmpeg / ffprobe location ---------- */
 
-  var extDir = window.__adobe_cep__.getSystemPath("extension");
+  // Raw __adobe_cep__.getSystemPath returns a file:/// URL; CSInterface.js
+  // normally strips the scheme. We call the raw API, so strip it here.
+  // (Verified live 2026-08-26: "file:///C:/Users/..." -> ENOENT without this.)
+  var extDir = decodeURIComponent(
+    window.__adobe_cep__.getSystemPath("extension").replace(/^file:\/{2,3}/, "")
+  );
   var FF = null, FP = null;
 
   function findTools() {
@@ -72,10 +77,15 @@
         tryNext(c.label + " spawn threw " + e.message);
         return;
       }
+      // A failed spawn fires BOTH error and close - only advance once.
+      var settled = false;
+      var once = function (fn) {
+        return function (a) { if (!settled) { settled = true; fn(a); } };
+      };
       var out = "";
       p.stdout.on("data", function (d) { out += d; });
-      p.on("error", function (e) { tryNext(c.label + " error " + (e.code || e.message)); });
-      p.on("close", function (code) {
+      p.on("error", once(function (e) { tryNext(c.label + " error " + (e.code || e.message)); }));
+      p.on("close", once(function (code) {
         if (code === 0) {
           FF = c.ff; FP = c.fp;
           var ver = (out.match(/ffmpeg version (\S+)/) || [])[1] || "?";
@@ -83,7 +93,7 @@
           $("ffstatus").className = "ok";
           log("ffmpeg found (" + c.label + "): " + c.ff, "ok");
         } else { tryNext(c.label + " exit code " + code); }
-      });
+      }));
     }
     tryNext();
   }
