@@ -8,7 +8,6 @@
   <ExecutionEnvironment>
     <HostList>
       <Host Name="PPRO" Version="[22.0,99.9]"/>
-      <Host Name="AME" Version="[22.0,99.9]"/>
     </HostList>
     <LocaleList>
       <Locale Code="All"/>
