@@ -328,30 +328,33 @@
   }
 
   function renderResults() {
-    var t = $("results");
-    while (t.firstChild) t.removeChild(t.firstChild);
+    var sel = $("resultSel"), dot = $("rdot");
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
     if (!results.length) {
-      t.appendChild(el("div", "empty",
-        "Analyze a file, or watch a folder and export - every render lands here."));
+      var o = el("option", null, "No results yet - analyze a file or watch a folder");
+      o.disabled = true; o.selected = true;
+      sel.appendChild(o);
+      sel.disabled = true;
+      dot.className = "dot";
       return;
     }
-    results.forEach(function (r) {
+    sel.disabled = false;
+    results.slice().reverse().forEach(function (r) {   // newest first
       var m = cache[r.key];
-      var item = el("div", "item" + (r.path === selectedPath ? " sel" : ""));
-      if (!m) {
-        item.appendChild(el("span", "dot"));
-        item.appendChild(el("span", "name", path.basename(r.path)));
-        item.appendChild(el("span", "vtext", "analyzing…"));
-      } else {
+      var label = path.basename(r.path);
+      if (!m) label += "  (analyzing…)";
+      else {
         var s = score(m);
-        item.appendChild(el("span", "dot " + (s.pass ? "pass" : "fail")));
-        item.appendChild(el("span", "name", path.basename(r.path)));
-        item.appendChild(el("span", "vtext" + (s.pass ? "" : " fail"),
-          s.pass ? "pass" : s.failCount + " fail"));
+        label += s.pass ? "  (pass)" : "  (" + s.failCount + " fail)";
       }
-      item.addEventListener("click", function () { selectedPath = r.path; renderAll(); });
-      t.appendChild(item);
+      var o = el("option", null, label);
+      o.value = r.path;
+      sel.appendChild(o);
     });
+    if (selectedPath) sel.value = selectedPath;
+    var sm = null;
+    results.forEach(function (r) { if (r.path === selectedPath) sm = cache[r.key]; });
+    dot.className = "dot" + (sm ? (score(sm).pass ? " pass" : " fail") : "");
   }
 
   // Meter window: where the track starts/ends and where the allowed band sits.
@@ -516,6 +519,11 @@
     if (saved.showAll) showAll = true;
 
     sel.addEventListener("change", function () { saveState(); renderAll(); });
+
+    $("resultSel").addEventListener("change", function () {
+      selectedPath = this.value;
+      renderAll();
+    });
 
     $("btnPick").addEventListener("click", function () {
       var r = window.cep.fs.showOpenDialogEx(true, false, "Choose audio or video files", "",

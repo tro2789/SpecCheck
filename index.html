@@ -46,27 +46,14 @@
   #ffstatus { color: var(--dim); font-size: 10px; }
   #ffstatus.bad { color: var(--fail); }
 
-  /* results list: hairline separators, no grid */
-  #results { margin-top: 2px; }
-  #results .item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 5px 6px; border-bottom: 1px solid var(--line);
-    cursor: pointer; transition: background .15s ease-out;
-  }
-  #results .item:hover { background: var(--surface); }
-  #results .item.sel { background: var(--surface); }
-  #results .item .name {
-    flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  #results .empty { color: var(--dim); padding: 8px 6px; }
+  /* results: fixed-height dropdown, verdict dot beside it */
   .dot {
-    width: 7px; height: 7px; border-radius: 50%; flex: none;
-    background: var(--dim);
+    width: 8px; height: 8px; border-radius: 50%; flex: none;
+    background: var(--dim); transition: background .15s ease-out;
   }
   .dot.pass { background: var(--pass); }
   .dot.fail { background: var(--fail); }
-  .vtext { font-size: 10px; color: var(--dim); white-space: nowrap; }
-  .vtext.fail { color: var(--fail); }
+  #resultSel { flex: 1; }
 
   /* scoreboard: hairline rows, range meters */
   #metrics { margin-top: 12px; }
@@ -134,7 +121,7 @@
   </div>
 
   <div class="label">Results</div>
-  <div id="results"></div>
+  <div class="row"><span class="dot" id="rdot"></span><select id="resultSel"></select></div>
 
   <div id="metrics"></div>
 
