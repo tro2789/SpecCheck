@@ -135,8 +135,7 @@
     function tryNext(reason) {
       if (reason) log("ffmpeg candidate failed: " + reason, "dim");
       if (i >= candidates.length) {
-        $("ffstatus").textContent = "ffmpeg: NOT FOUND - run setup-ffmpeg.ps1";
-        $("ffstatus").className = "bad";
+        log("ffmpeg not found - run setup-ffmpeg.ps1, then reopen the panel", "bad");
         return;
       }
       var c = candidates[i++];
@@ -153,9 +152,10 @@
       p.on("close", once(function (code) {
         if (code === 0) {
           FF = c.ff; FP = c.fp;
-          var ver = (out.match(/ffmpeg version (\S+)/) || [])[1] || "?";
-          $("ffstatus").textContent = "ffmpeg " + ver + " (" + c.label + ")";
-          $("ffstatus").className = "ok";
+          var ver = ((out.match(/ffmpeg version (\S+)/) || [])[1] || "?").split("-")[0];
+          log("ffmpeg " + ver + " ready (" + c.label + ")", "ok");
+          $("btnPick").disabled = false;
+          $("btnWatch").disabled = false;
         } else { tryNext(c.label + " exit code " + code); }
       }));
     }

@@ -43,9 +43,6 @@
   input[type=text] { flex: 1; }
   input::placeholder { color: var(--dim); }
 
-  #ffstatus { color: var(--dim); font-size: 10px; }
-  #ffstatus.bad { color: var(--fail); }
-
   /* results: fixed-height dropdown, verdict dot beside it */
   .dot {
     width: 8px; height: 8px; border-radius: 50%; flex: none;
@@ -109,15 +106,14 @@
 
   <div class="row">
     <select id="preset" title="Delivery spec preset"></select>
-    <button id="btnPick" class="primary">Analyze file&hellip;</button>
-    <span id="ffstatus" style="margin-left:auto">checking&hellip;</span>
+    <button id="btnPick" class="primary" disabled>Analyze file&hellip;</button>
   </div>
 
   <div class="label">Watch folder</div>
   <div class="row">
     <input type="text" id="watchPath" placeholder="exports land here">
     <button id="btnBrowse" title="Choose folder">&hellip;</button>
-    <button id="btnWatch">Start</button>
+    <button id="btnWatch" disabled>Start</button>
   </div>
 
   <div class="label">Results</div>
