@@ -7,7 +7,8 @@ register: product
 A Premiere Pro CEP panel that answers one question at a glance: does this
 mix pass the delivery spec? It measures rendered audio (LUFS, true peak,
 RMS, noise floor, silence, format) and scores it against a chosen preset
-(ACX/Audible, Apple Podcasts, Spotify, EBU R128, YouTube, custom).
+(ACX/Audible, Audible Originals, Apple Podcasts, Spotify, EBU R128,
+YouTube, custom).
 
 ## Users
 

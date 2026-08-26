@@ -69,6 +69,19 @@
       { m: "noiseFloor", max: -60 },
       { m: "bitrateKbps", min: 192 }
     ],
+    // Encoded from the Law&Crime spec sheet via the EP1 QC report (2026-08-24).
+    // LRA <= 7 LU is a recommendation in that spec, not an acceptance
+    // criterion, so it is shown but not checked.
+    "Audible Originals": [
+      { m: "lufsI", min: -18, max: -16 },
+      { m: "truePeak", max: -1 },
+      { m: "noiseFloor", max: -60 },
+      { m: "headSilence", max: 3 },
+      { m: "tailSilence", max: 3 },
+      { m: "sampleRateHz", min: 44100, max: 44100 },
+      { m: "channels", min: 1, max: 2 },
+      { m: "duration", max: 7140 }
+    ],
     "Apple Podcasts": [
       { m: "lufsI", min: -17, max: -15 },
       { m: "truePeak", max: -1 }
@@ -431,8 +444,12 @@
     var by = {}, pass = true, fails = 0, unknown = 0;
     activeChecks().forEach(function (c) {
       var v = metrics ? metrics[c.m] : null;
-      var req = (c.min !== undefined && c.max !== undefined) ? c.min + " to " + c.max
-        : (c.min !== undefined) ? "≥ " + c.min : "≤ " + c.max;
+      var def = null;
+      for (var i = 0; i < METRICS.length; i++) if (METRICS[i].key === c.m) def = METRICS[i];
+      var fb = function (n) { return def && def.time ? fmtVal(def, n) : String(n); };
+      var req = (c.min !== undefined && c.max !== undefined)
+        ? (c.min === c.max ? "= " + fb(c.min) : fb(c.min) + " to " + fb(c.max))
+        : (c.min !== undefined) ? "≥ " + fb(c.min) : "≤ " + fb(c.max);
       var ok = null;
       if (v !== null && v !== undefined) {
         ok = (c.min === undefined || v >= c.min) && (c.max === undefined || v <= c.max);
