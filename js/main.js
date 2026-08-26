@@ -549,7 +549,9 @@
         var meter = el("div", "meter");
         if (check && v !== null && v !== undefined) {
           var w = meterWindow(check);
-          var band = el("div", "band");
+          var openCls = check.min === undefined ? " open-left"
+            : check.max === undefined ? " open-right" : "";
+          var band = el("div", "band" + openCls);
           band.style.left = pct(w.bLo, w) + "%";
           band.style.width = (pct(w.bHi, w) - pct(w.bLo, w)) + "%";
           meter.appendChild(band);

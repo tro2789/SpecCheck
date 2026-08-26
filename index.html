@@ -86,6 +86,14 @@
     /* CEP 12 = Chromium 99: no color-mix, keep a plain rgba tint */
     background: rgba(86, 168, 101, 0.26);
   }
+  /* One-sided checks: the allowed zone is open-ended, so fade that edge
+     instead of stopping it hard. */
+  .meter .band.open-left {
+    background: linear-gradient(to right, rgba(86,168,101,0), rgba(86,168,101,0.26) 65%);
+  }
+  .meter .band.open-right {
+    background: linear-gradient(to left, rgba(86,168,101,0), rgba(86,168,101,0.26) 65%);
+  }
   .meter .mark {
     position: absolute; top: 0; bottom: 0; width: 2px;
     transition: left .2s ease-out;
