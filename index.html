@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spec Check</title>
+<style>
+  :root {
+    --bg: #1f2126; --panel: #26282e; --line: #3a3d45;
+    --text: #d8dade; --dim: #9a9da6; --accent: #2d7dd2;
+    --ok: #4caf50; --bad: #e5533d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 10px; background: var(--bg); color: var(--text);
+    font: 12px/1.45 "Segoe UI", sans-serif;
+  }
+  h2 {
+    margin: 12px 0 6px; font-size: 11px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+  button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    padding: 5px 10px; cursor: pointer; font-size: 12px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  input[type=text] {
+    flex: 1; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); padding: 5px 6px; font-size: 12px;
+  }
+  #ffstatus { color: var(--dim); }
+  #ffstatus.ok { color: var(--ok); }
+  #ffstatus.bad { color: var(--bad); }
+  table {
+    width: 100%; border-collapse: collapse; margin-top: 4px;
+    background: var(--panel);
+  }
+  td, th {
+    border: 1px solid var(--line); padding: 3px 7px; text-align: left;
+    font-size: 12px;
+  }
+  th { color: var(--dim); font-weight: 600; }
+  td.num { font-family: Consolas, monospace; }
+  #log {
+    margin-top: 10px; height: 170px; overflow-y: auto; background: #17181c;
+    border: 1px solid var(--line); padding: 6px; font: 11px Consolas, monospace;
+    white-space: pre-wrap;
+  }
+  #log .ok { color: var(--ok); }
+  #log .bad { color: var(--bad); }
+  #log .dim { color: var(--dim); }
+</style>
+</head>
+<body>
+
+  <div class="row">
+    <span id="ffstatus">ffmpeg: checking...</span>
+  </div>
+
+  <h2>Analyze a file</h2>
+  <div class="row">
+    <button id="btnPick" class="primary">Analyze file...</button>
+    <span id="curfile" style="color:var(--dim)"></span>
+  </div>
+
+  <h2>Watch folder</h2>
+  <div class="row">
+    <input type="text" id="watchPath" placeholder="folder to watch">
+    <button id="btnBrowse">Browse...</button>
+  </div>
+  <div class="row">
+    <button id="btnWatch" class="primary">Start watching</button>
+    <span id="watchState" style="color:var(--dim)">idle</span>
+  </div>
+
+  <h2>Measurements</h2>
+  <table id="metrics">
+    <tr><th>Metric</th><th>Value</th></tr>
+  </table>
+
+  <div id="log"></div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
