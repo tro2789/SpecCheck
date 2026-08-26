@@ -49,12 +49,6 @@
   input[type=number] { width: 62px; padding: 4px 5px; font-family: Consolas, monospace; }
   input::placeholder { color: var(--dim); }
 
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%; flex: none;
-    background: var(--dim); transition: background .15s ease-out;
-  }
-  .dot.pass { background: var(--pass); }
-  .dot.fail { background: var(--fail); }
   #resultSel { flex: 1; }
 
   /* scoreboard */
@@ -115,7 +109,7 @@
   </div>
 
   <div class="row" style="margin-top:8px">
-    <span class="dot" id="rdot"></span><select id="resultSel"></select>
+    <select id="resultSel"></select>
   </div>
 
   <div id="metrics"></div>

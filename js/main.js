@@ -469,14 +469,13 @@
   }
 
   function renderResults() {
-    var sel = $("resultSel"), dot = $("rdot");
+    var sel = $("resultSel");
     while (sel.firstChild) sel.removeChild(sel.firstChild);
     if (!results.length) {
       var o = el("option", null, "No results yet - analyze a file or watch a folder");
       o.disabled = true; o.selected = true;
       sel.appendChild(o);
       sel.disabled = true;
-      dot.className = "dot";
       return;
     }
     sel.disabled = false;
@@ -493,9 +492,6 @@
       sel.appendChild(o);
     });
     if (selectedPath) sel.value = selectedPath;
-    var sm = null;
-    results.forEach(function (r) { if (r.path === selectedPath) sm = cache[r.key]; });
-    dot.className = "dot" + (sm ? (score(sm).pass ? " pass" : " fail") : "");
   }
 
   function renderScoreboard() {
