@@ -108,6 +108,11 @@
   .meter .mark.pass { background: var(--pass); }
   .meter .mark.fail { background: var(--fail); }
   .meter-spacer { flex: 0 0 96px; }
+  .mtoggle {
+    padding: 5px 6px; color: var(--dim); font-size: 10px; cursor: pointer;
+    transition: color .15s ease-out;
+  }
+  .mtoggle:hover { color: var(--text); }
 
   #log {
     margin-top: 12px; height: 96px; overflow-y: auto;

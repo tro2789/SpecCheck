@@ -82,6 +82,7 @@
   var cache = {};      // key(path|size|mtime) -> metrics
   var results = [];    // [{path, key}] session list, newest last
   var selectedPath = null;
+  var showAll = false; // scoreboard: checked metrics only vs full set
 
   function cacheKey(file, st) { return file + "|" + st.size + "|" + st.mtimeMs; }
 
@@ -390,8 +391,10 @@
         " checks failing (" + $("preset").value + ")" +
         (s.unknown ? ", " + s.unknown + " unmeasured" : "");
 
+    var hidden = 0;
     METRICS.forEach(function (def) {
       var chk = s.byMetric[def.key];
+      if (!chk && !showAll) { hidden++; return; }
       var row = el("div", "mrow" + (chk ? "" : " unchecked"));
       row.appendChild(el("span", "mlabel", def.label));
       row.appendChild(el("span",
@@ -419,6 +422,15 @@
       }
       t.appendChild(row);
     });
+
+    var toggle = el("div", "mtoggle",
+      showAll ? "Show checked only" : "Show all metrics (" + hidden + " more)");
+    toggle.addEventListener("click", function () {
+      showAll = !showAll;
+      saveState();
+      renderScoreboard();
+    });
+    t.appendChild(toggle);
   }
 
   /* ---------- watch folder ---------- */
@@ -493,7 +505,8 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         preset: $("preset").value,
-        watchPath: $("watchPath").value
+        watchPath: $("watchPath").value,
+        showAll: showAll
       }));
     } catch (e) {}
   }
@@ -509,6 +522,7 @@
     try { saved = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) {}
     if (saved.preset && PRESETS[saved.preset]) sel.value = saved.preset;
     if (saved.watchPath) $("watchPath").value = saved.watchPath;
+    if (saved.showAll) showAll = true;
 
     sel.addEventListener("change", function () { saveState(); renderAll(); });
 
