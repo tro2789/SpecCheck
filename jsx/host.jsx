@@ -7,7 +7,7 @@ function SC_activeSeq() {
 }
 
 // Find a marker named "roomtone" (case/space-insensitive) on the active
-// sequence; returns "startSeconds|durationSeconds" or "".
+// sequence; returns "startSeconds|durationSeconds|isPointMarker" or "".
 function SC_roomtone() {
     if (!app.project || !app.project.activeSequence) return "";
     var ms = app.project.activeSequence.markers;
@@ -18,8 +18,8 @@ function SC_roomtone() {
         if (name === "roomtone") {
             var s = m.start.seconds;
             var d = m.end.seconds - s;
-            if (d <= 0.1) d = 2; // point marker: sample 2 s from its position
-            return s + "|" + d;
+            if (d <= 0.1) return s + "|2|1"; // point marker: panel searches near it
+            return s + "|" + d + "|0";
         }
         m = ms.getNextMarker(m);
     }

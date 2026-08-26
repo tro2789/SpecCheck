@@ -290,8 +290,12 @@
         if (wa === "0") {
           evalES("SC_roomtone()").then(function (rt) {
             var parts = String(rt).split("|");
-            if (parts.length === 2) {
-              roomtoneMap[outPath] = { start: parseFloat(parts[0]), dur: parseFloat(parts[1]) };
+            if (parts.length >= 2) {
+              roomtoneMap[outPath] = {
+                start: parseFloat(parts[0]),
+                dur: parseFloat(parts[1]),
+                point: parts[2] === "1"
+              };
               log("Room-tone marker found at " + parts[0] + " s", "ok");
             }
           });
@@ -404,16 +408,38 @@
       .then(function (r) {
         var s = parseSilence(r.stderr, metrics.duration);
         metrics.headSilence = s.headSilence; metrics.tailSilence = s.tailSilence;
-        // Noise floor: exact room-tone RMS when Check mix captured a marker
-        // region; otherwise the min-momentary approximation.
+        // Noise floor from a Check-mix room-tone marker:
+        // - duration marker: exact RMS over the marked region.
+        // - point marker: quietest 0.5 s window within 2 s either side, so a
+        //   marker beside a short gap cannot pull dialog into the measurement.
+        // Otherwise the min-momentary approximation.
         var rt = roomtoneMap[file];
-        if (rt) {
+        if (rt && !rt.point) {
           return run(FF, ["-nostats", "-ss", String(rt.start), "-t", String(rt.dur),
             "-i", file, "-map", "0:a:0",
             "-af", "astats=measure_perchannel=none", "-f", "null", "-"])
             .then(function (r2) {
               metrics.noiseFloor = parseAstats(r2.stderr).rmsDb;
               metrics.noiseFloorExact = true;
+            });
+        }
+        if (rt) {
+          var winStart = Math.max(0, rt.start - 2);
+          var n = Math.round((metrics.sampleRateHz || 48000) / 2);
+          return run(FF, ["-nostats", "-ss", String(winStart), "-t", "4",
+            "-i", file, "-map", "0:a:0",
+            "-af", "asetnsamples=n=" + n +
+              ",astats=metadata=1:reset=1:measure_perchannel=none" +
+              ",ametadata=mode=print:key=lavfi.astats.Overall.RMS_level:file=-",
+            "-f", "null", "-"])
+            .then(function (r2) {
+              var best = null, reW = /RMS_level=(-?[\d.]+)/g, mW;
+              while ((mW = reW.exec(r2.stdout)) !== null) {
+                var vW = parseFloat(mW[1]);
+                if (vW > -100 && (best === null || vW < best)) best = vW;
+              }
+              metrics.noiseFloor = best !== null ? best : metrics.minMomentary;
+              metrics.noiseFloorExact = best !== null;
             });
         }
         metrics.noiseFloor = metrics.minMomentary;
