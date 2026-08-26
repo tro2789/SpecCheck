@@ -4,96 +4,141 @@
 <meta charset="utf-8">
 <title>Spec Check</title>
 <style>
+  /* Defaults are the darkest-skin reference; applySkin() overrides them
+     at runtime from Premiere's appSkinInfo so the panel follows the host
+     brightness setting. See DESIGN.md. */
   :root {
-    --bg: #1f2126; --panel: #26282e; --line: #3a3d45;
-    --text: #d8dade; --dim: #9a9da6; --accent: #2d7dd2;
-    --ok: #4caf50; --bad: #e5533d;
+    --bg: #232323; --surface: #2a2a2a; --inset: #1b1b1b;
+    --line: #3d3d3d; --text: #d6d6d6; --dim: #8f8f8f;
+    --accent: #2d8ceb; --pass: #56a865; --fail: #d4593f;
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
-    margin: 0; padding: 10px; background: var(--bg); color: var(--text);
-    font: 12px/1.45 "Segoe UI", sans-serif;
+    margin: 0; padding: 10px 12px; background: var(--bg); color: var(--text);
+    font: 11px/1.5 "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column; gap: 0;
   }
-  h2 {
-    margin: 12px 0 6px; font-size: 11px; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--dim);
+  .label {
+    margin: 14px 0 5px; font-size: 10px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--dim); font-weight: 600;
   }
-  .row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
-  button {
-    background: var(--panel); color: var(--text); border: 1px solid var(--line);
-    padding: 5px 10px; cursor: pointer; font-size: 12px;
+  .row { display: flex; gap: 6px; align-items: center; }
+
+  button, select, input[type=text] {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 4px 9px; font: 11px "Segoe UI", system-ui, sans-serif;
+    transition: border-color .15s ease-out, opacity .15s ease-out;
   }
-  button:hover { border-color: var(--accent); }
+  button { cursor: pointer; white-space: nowrap; }
+  button:hover, select:hover { border-color: var(--dim); }
+  button:focus-visible, select:focus-visible, input:focus-visible {
+    outline: 1px solid var(--accent); outline-offset: 0;
+  }
+  button:disabled, input:disabled { opacity: .5; cursor: default; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  input[type=text], select {
-    flex: 1; background: var(--panel); color: var(--text);
-    border: 1px solid var(--line); padding: 5px 6px; font-size: 12px;
+  button.primary:hover { filter: brightness(1.1); }
+  select { padding-right: 20px; }
+  input[type=text] { flex: 1; }
+  input::placeholder { color: var(--dim); }
+
+  #ffstatus { color: var(--dim); font-size: 10px; }
+  #ffstatus.bad { color: var(--fail); }
+
+  /* results list: hairline separators, no grid */
+  #results { margin-top: 2px; }
+  #results .item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 6px; border-bottom: 1px solid var(--line);
+    cursor: pointer; transition: background .15s ease-out;
   }
-  #ffstatus { color: var(--dim); }
-  #ffstatus.ok { color: var(--ok); }
-  #ffstatus.bad { color: var(--bad); }
-  table {
-    width: 100%; border-collapse: collapse; margin-top: 4px;
-    background: var(--panel);
+  #results .item:hover { background: var(--surface); }
+  #results .item.sel { background: var(--surface); }
+  #results .item .name {
+    flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  td, th {
-    border: 1px solid var(--line); padding: 3px 7px; text-align: left;
-    font-size: 12px;
+  #results .empty { color: var(--dim); padding: 8px 6px; }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%; flex: none;
+    background: var(--dim);
   }
-  th { color: var(--dim); font-weight: 600; }
-  td.num { font-family: Consolas, monospace; white-space: nowrap; }
-  td.dim { color: var(--dim); }
-  .chip {
-    display: inline-block; padding: 0 7px; font-size: 11px; font-weight: 600;
-    border-radius: 2px; color: #fff;
-  }
-  .chip.pass { background: var(--ok); }
-  .chip.fail { background: var(--bad); }
-  .chip.na { background: var(--line); color: var(--dim); }
+  .dot.pass { background: var(--pass); }
+  .dot.fail { background: var(--fail); }
+  .vtext { font-size: 10px; color: var(--dim); white-space: nowrap; }
+  .vtext.fail { color: var(--fail); }
+
+  /* verdict line */
   #verdict {
-    margin-top: 8px; padding: 7px 10px; font-weight: 700; font-size: 13px;
-    display: none;
+    display: none; align-items: center; gap: 7px;
+    margin: 14px 0 4px; font-weight: 600;
   }
-  #verdict.pass { display: block; background: var(--ok); color: #fff; }
-  #verdict.fail { display: block; background: var(--bad); color: #fff; }
-  #results tr.sel td { background: #2e3138; }
-  #results tr { cursor: pointer; }
+  #verdict.show { display: flex; }
+
+  /* scoreboard: hairline rows, range meters */
+  #metrics .mrow {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 6px; border-bottom: 1px solid var(--line);
+  }
+  #metrics .mrow .mlabel { flex: 1 1 40%; }
+  #metrics .mrow.unchecked .mlabel,
+  #metrics .mrow.unchecked .mval { color: var(--dim); }
+  .mval {
+    font: 11px Consolas, monospace; white-space: nowrap;
+    flex: 0 0 84px; text-align: right;
+  }
+  .mval.fail { color: var(--fail); }
+  .mreq {
+    font: 10px Consolas, monospace; color: var(--dim);
+    flex: 0 0 74px; text-align: right; white-space: nowrap;
+  }
+  .meter {
+    flex: 0 0 96px; height: 8px; background: var(--inset);
+    border-radius: 2px; position: relative; overflow: hidden;
+  }
+  .meter .band {
+    position: absolute; top: 0; bottom: 0;
+    /* CEP 12 = Chromium 99: no color-mix, keep a plain rgba tint */
+    background: rgba(86, 168, 101, 0.26);
+  }
+  .meter .mark {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    transition: left .2s ease-out;
+  }
+  .meter .mark.pass { background: var(--pass); }
+  .meter .mark.fail { background: var(--fail); }
+  .meter-spacer { flex: 0 0 96px; }
+
   #log {
-    margin-top: 10px; height: 120px; overflow-y: auto; background: #17181c;
-    border: 1px solid var(--line); padding: 6px; font: 11px Consolas, monospace;
+    margin-top: 12px; height: 96px; overflow-y: auto;
+    background: var(--inset); border-radius: 3px;
+    padding: 5px 7px; font: 10px Consolas, monospace; color: var(--dim);
     white-space: pre-wrap;
   }
-  #log .ok { color: var(--ok); }
-  #log .bad { color: var(--bad); }
-  #log .dim { color: var(--dim); }
+  #log .bad { color: var(--fail); }
+  #log .ok { color: var(--text); }
 </style>
 </head>
 <body>
 
   <div class="row">
-    <span id="ffstatus">ffmpeg: checking...</span>
+    <select id="preset" title="Delivery spec preset"></select>
+    <button id="btnPick" class="primary">Analyze file&hellip;</button>
+    <span id="ffstatus" style="margin-left:auto">checking&hellip;</span>
   </div>
 
+  <div class="label">Watch folder</div>
   <div class="row">
-    <select id="preset"></select>
-    <button id="btnPick" class="primary">Analyze file...</button>
+    <input type="text" id="watchPath" placeholder="exports land here">
+    <button id="btnBrowse" title="Choose folder">&hellip;</button>
+    <button id="btnWatch">Start</button>
   </div>
 
-  <h2>Watch folder</h2>
-  <div class="row">
-    <input type="text" id="watchPath" placeholder="folder to watch">
-    <button id="btnBrowse">Browse...</button>
-    <button id="btnWatch" class="primary">Start</button>
-  </div>
-  <div class="row"><span id="watchState" style="color:var(--dim)">idle</span></div>
+  <div class="label">Results</div>
+  <div id="results"></div>
 
-  <h2>Results</h2>
-  <table id="results">
-    <tr><th>File</th><th>Verdict</th></tr>
-  </table>
-
-  <div id="verdict"></div>
-  <table id="metrics"></table>
+  <div id="verdict"><span class="dot" id="vdot"></span><span id="vtext"></span></div>
+  <div id="metrics"></div>
 
   <div id="log"></div>
 

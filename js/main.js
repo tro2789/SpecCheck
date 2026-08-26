@@ -42,13 +42,13 @@
     { key: "truePeak", label: "True peak", unit: " dBTP" },
     { key: "rmsDb", label: "Overall RMS", unit: " dB" },
     { key: "samplePeakDb", label: "Sample peak", unit: " dBFS" },
-    { key: "minMomentary", label: "Noise floor (min momentary, approx)", unit: " LUFS" },
+    { key: "minMomentary", label: "Noise floor (approx)", unit: " LUFS" },
     { key: "headSilence", label: "Head silence", unit: " s" },
     { key: "tailSilence", label: "Tail silence", unit: " s" },
     { key: "sampleRateHz", label: "Sample rate", unit: " Hz", int: true },
     { key: "bitrateKbps", label: "Bitrate", unit: " kbps", int: true },
     { key: "channels", label: "Channels", unit: "", int: true },
-    { key: "duration", label: "Duration", unit: " s" }
+    { key: "duration", label: "Duration", unit: "", time: true }
   ];
 
   // Presets: checklists only. Unlisted metrics are shown but not judged.
@@ -91,6 +91,38 @@
     window.__adobe_cep__.getSystemPath("extension").replace(/^file:\/{2,3}/, "")
   );
   var FF = null, FP = null;
+
+  /* ---------- host skin adaptation ---------- */
+
+  function applySkin() {
+    // Derive every surface color from Premiere's panel background so the
+    // panel follows the host brightness slider. Rules live in DESIGN.md.
+    var c;
+    try {
+      var env = JSON.parse(window.__adobe_cep__.getHostEnvironment());
+      c = env.appSkinInfo.panelBackgroundColor.color; // {red,green,blue} 0-255
+    } catch (e) { return; } // keep CSS defaults
+    if (!c) return;
+    var mix = function (v, target, f) { return Math.round(v + (target - v) * f); };
+    var rgb = function (r, g, b) { return "rgb(" + r + "," + g + "," + b + ")"; };
+    var toward = function (target, f) {
+      return rgb(mix(c.red, target, f), mix(c.green, target, f), mix(c.blue, target, f));
+    };
+    var lum = (0.299 * c.red + 0.587 * c.green + 0.114 * c.blue) / 255;
+    var darkSkin = lum < 0.5;
+    var s = document.documentElement.style;
+    s.setProperty("--bg", rgb(Math.round(c.red), Math.round(c.green), Math.round(c.blue)));
+    s.setProperty("--surface", toward(darkSkin ? 255 : 0, 0.04));
+    s.setProperty("--inset", toward(darkSkin ? 0 : 255, 0.22));
+    s.setProperty("--line", toward(darkSkin ? 255 : 0, 0.11));
+    s.setProperty("--text", darkSkin ? "#d6d6d6" : "#242424");
+    s.setProperty("--dim", darkSkin ? "#8f8f8f" : "#6c6c6c");
+  }
+  applySkin();
+  try {
+    window.__adobe_cep__.addEventListener(
+      "com.adobe.csxs.events.ThemeColorChanged", applySkin, null);
+  } catch (e) {}
 
   function findTools() {
     var local = path.join(extDir, "tools", "ffmpeg", "bin");
@@ -280,6 +312,12 @@
 
   function fmtVal(def, v) {
     if (v === null || v === undefined) return "?";
+    if (def.time) {
+      var t = Math.round(v), h = Math.floor(t / 3600),
+        mm = Math.floor(t / 60) % 60, ss = t % 60;
+      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+      return (h ? h + ":" + pad(mm) : String(mm)) + ":" + pad(ss);
+    }
     return (def.int ? String(Math.round(v)) : v.toFixed(1)) + def.unit;
   }
 
@@ -291,62 +329,95 @@
   function renderResults() {
     var t = $("results");
     while (t.firstChild) t.removeChild(t.firstChild);
-    var head = el("tr");
-    head.appendChild(el("th", null, "File"));
-    head.appendChild(el("th", null, "Verdict"));
-    t.appendChild(head);
+    if (!results.length) {
+      t.appendChild(el("div", "empty",
+        "Analyze a file, or watch a folder and export - every render lands here."));
+      return;
+    }
     results.forEach(function (r) {
       var m = cache[r.key];
-      var tr = el("tr", r.path === selectedPath ? "sel" : null);
-      tr.appendChild(el("td", null, path.basename(r.path)));
-      var v = el("td");
+      var item = el("div", "item" + (r.path === selectedPath ? " sel" : ""));
       if (!m) {
-        v.appendChild(el("span", "chip na", "analyzing"));
+        item.appendChild(el("span", "dot"));
+        item.appendChild(el("span", "name", path.basename(r.path)));
+        item.appendChild(el("span", "vtext", "analyzing…"));
       } else {
         var s = score(m);
-        v.appendChild(el("span", "chip " + (s.pass ? "pass" : "fail"),
-          s.pass ? "PASS" : "FAIL (" + s.failCount + ")"));
+        item.appendChild(el("span", "dot " + (s.pass ? "pass" : "fail")));
+        item.appendChild(el("span", "name", path.basename(r.path)));
+        item.appendChild(el("span", "vtext" + (s.pass ? "" : " fail"),
+          s.pass ? "pass" : s.failCount + " fail"));
       }
-      tr.appendChild(v);
-      tr.addEventListener("click", function () { selectedPath = r.path; renderAll(); });
-      t.appendChild(tr);
+      item.addEventListener("click", function () { selectedPath = r.path; renderAll(); });
+      t.appendChild(item);
     });
   }
 
+  // Meter window: where the track starts/ends and where the allowed band sits.
+  function meterWindow(c) {
+    if (c.min !== undefined && c.max !== undefined) {
+      var pad = (c.max - c.min) || 1;
+      return { wLo: c.min - pad, wHi: c.max + pad, bLo: c.min, bHi: c.max };
+    }
+    if (c.max !== undefined) {
+      var span = Math.max(Math.abs(c.max) * 0.5, 6);
+      return { wLo: c.max - span, wHi: c.max + span * 0.5, bLo: c.max - span, bHi: c.max };
+    }
+    var span2 = Math.max(Math.abs(c.min) * 0.5, 6);
+    return { wLo: c.min - span2 * 0.5, wHi: c.min + span2, bLo: c.min, bHi: c.min + span2 };
+  }
+
+  function pct(v, w) {
+    var p = (v - w.wLo) / (w.wHi - w.wLo) * 100;
+    return Math.max(2, Math.min(98, p));
+  }
+
   function renderScoreboard() {
-    var t = $("metrics"), banner = $("verdict");
+    var t = $("metrics"), verdict = $("verdict");
     while (t.firstChild) t.removeChild(t.firstChild);
-    banner.className = ""; banner.textContent = "";
+    verdict.className = "";
     var entry = null;
     results.forEach(function (r) { if (r.path === selectedPath) entry = r; });
     var m = entry ? cache[entry.key] : null;
     if (!m) return;
 
     var s = score(m);
-    banner.className = s.pass ? "pass" : "fail";
-    banner.textContent = m.file + " - " + $("preset").value + ": " +
-      (s.pass ? "PASS" : "FAIL (" + s.failCount + " of " + activeChecks().length + ")") +
-      (s.unknown ? " (" + s.unknown + " unmeasured)" : "");
+    verdict.className = "show";
+    $("vdot").className = "dot " + (s.pass ? "pass" : "fail");
+    $("vtext").textContent = s.pass
+      ? m.file + " passes " + $("preset").value
+      : m.file + ": " + s.failCount + " of " + activeChecks().length +
+        " checks failing (" + $("preset").value + ")" +
+        (s.unknown ? ", " + s.unknown + " unmeasured" : "");
 
-    var head = el("tr");
-    ["Metric", "Measured", "Required", ""].forEach(function (h) {
-      head.appendChild(el("th", null, h));
-    });
-    t.appendChild(head);
     METRICS.forEach(function (def) {
-      var tr = el("tr");
-      var checked = s.byMetric[def.key];
-      tr.appendChild(el("td", checked ? null : "dim", def.label));
-      tr.appendChild(el("td", "num" + (checked ? "" : " dim"), fmtVal(def, m[def.key])));
-      tr.appendChild(el("td", "num dim", checked ? checked.required : ""));
-      var chipTd = el("td");
-      if (checked) {
-        if (checked.pass === null) chipTd.appendChild(el("span", "chip na", "?"));
-        else chipTd.appendChild(el("span", "chip " + (checked.pass ? "pass" : "fail"),
-          checked.pass ? "PASS" : "FAIL"));
+      var chk = s.byMetric[def.key];
+      var row = el("div", "mrow" + (chk ? "" : " unchecked"));
+      row.appendChild(el("span", "mlabel", def.label));
+      row.appendChild(el("span",
+        "mval" + (chk && chk.pass === false ? " fail" : ""),
+        fmtVal(def, m[def.key])));
+      row.appendChild(el("span", "mreq", chk ? chk.required : ""));
+      if (chk) {
+        var check = null;
+        activeChecks().forEach(function (c) { if (c.m === def.key) check = c; });
+        var v = m[def.key];
+        var meter = el("div", "meter");
+        if (check && v !== null && v !== undefined) {
+          var w = meterWindow(check);
+          var band = el("div", "band");
+          band.style.left = pct(w.bLo, w) + "%";
+          band.style.width = (pct(w.bHi, w) - pct(w.bLo, w)) + "%";
+          meter.appendChild(band);
+          var mark = el("div", "mark " + (chk.pass ? "pass" : "fail"));
+          mark.style.left = pct(v, w) + "%";
+          meter.appendChild(mark);
+        }
+        row.appendChild(meter);
+      } else {
+        row.appendChild(el("div", "meter-spacer"));
       }
-      tr.appendChild(chipTd);
-      t.appendChild(tr);
+      t.appendChild(row);
     });
   }
 
@@ -401,8 +472,8 @@
       return;
     }
     pollTimer = setInterval(poll, 500);
-    $("watchState").textContent = "watching " + dir;
     $("btnWatch").textContent = "Stop";
+    $("watchPath").disabled = true;
     log("Watch started: " + dir, "ok");
   }
 
@@ -410,8 +481,8 @@
     if (watcher) { watcher.close(); watcher = null; }
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     candidates = {};
-    $("watchState").textContent = "idle";
     $("btnWatch").textContent = "Start";
+    $("watchPath").disabled = false;
   }
 
   /* ---------- UI wiring ---------- */
@@ -462,5 +533,22 @@
   }
 
   initUI();
+  renderAll();
   findTools();
+
+  // Dev-only hook: lets a browser harness inject canned metrics to preview
+  // the UI outside Premiere. No effect in normal use.
+  window.__specDebug = {
+    inject: function (metrics) {
+      var key = "demo|" + metrics.file;
+      cache[key] = metrics;
+      upsertResult(metrics.path || metrics.file, key);
+      // upsertResult keys by path; force our demo key
+      results.forEach(function (r) {
+        if (r.path === (metrics.path || metrics.file)) r.key = key;
+      });
+      selectedPath = metrics.path || metrics.file;
+      renderAll();
+    }
+  };
 })();
