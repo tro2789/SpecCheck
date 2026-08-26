@@ -3,9 +3,14 @@
 CEP panel for Premiere Pro: measure a mix against a delivery spec (Audible/ACX,
 Apple Podcasts, Spotify, broadcast, custom) and show a pass/fail scoreboard.
 
-**Status: Phase 3 feature-complete** (pending the Audible Originals
-preset numbers). Plan:
-`~/Repos/docs/plans/premiere-audio-qc-panel.md` (on the Debian VM).
+## Install (users)
+
+Download the signed `.zxp` from the
+[latest release](https://github.com/tro2789/SpecCheck/releases/latest)
+and open it with [ZXPInstaller](https://zxpinstaller.com). Restart Premiere →
+**Window > Extensions > Spec Check**. On first use, run the panel's ffmpeg
+setup (or point it at an ffmpeg already on your PATH). Windows, Premiere
+Pro 22.0+.
 
 ## How it works
 
@@ -50,8 +55,16 @@ Restart Premiere, then **Window > Extensions > Spec Check**.
 
 ## Repo
 
-Source of truth: `ssh://gitea@192.168.0.245:2222/tro2789/SpecCheck.git`.
-Push there only; a GitHub mirror gets added at first public release.
+- **Source of truth:** the private Gitea. Always push there — commits and
+  tags auto-mirror to GitHub (push mirror: on-commit + 8h interval).
+- **Public mirror + releases:** `https://github.com/tro2789/SpecCheck`.
+  Never push to GitHub directly. Releases are created on GitHub with the
+  signed `.zxp` attached.
 
 `tools/` (the ffmpeg download) is gitignored and lives only in the installed
-extension dir.
+extension dir. ffmpeg is version-pinned (8.1.2) and downloaded with user
+consent, not bundled in the `.zxp`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

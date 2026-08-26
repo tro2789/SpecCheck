@@ -69,7 +69,7 @@
       { m: "noiseFloor", max: -60 },
       { m: "bitrateKbps", min: 192 }
     ],
-    // Encoded from the Law&Crime spec sheet via the EP1 QC report (2026-08-24).
+    // Encoded from an Audible Originals delivery spec sheet (2026-08).
     // LRA <= 7 LU is a recommendation in that spec, not an acceptance
     // criterion, so it is shown but not checked.
     "Audible Originals": [
