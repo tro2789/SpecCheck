@@ -16,9 +16,15 @@ npm run typecheck
 npm test
 ```
 
-The build uses relative asset URLs (`base: "./"`), so `dist/` works at a
-domain root and under a subpath. On Vercel, set Root Directory to `web`; the
-Vite preset needs no extra config.
+Public URL: https://www.trevorohare.com/spec-check. trevorohare.com proxies
+`/spec-check` and `/spec-check/*` to this Vercel project (rewrites in that
+repo's `vercel.json`). The build uses `base: "/spec-check/"` because
+trevorohare.com strips trailing slashes, which breaks relative asset URLs.
+`web/vercel.json` maps `/spec-check/*` back to the built files, so the
+project's own `.vercel.app` URL works too. On Vercel the Root Directory is
+`web`; the ignored-build command skips deploys for commits that do not touch
+`web/`. `public/licenses.txt` carries the MP3 decoder's MIT and LGPL-2.1
+notices (linked from the footer); update it if the decoder changes.
 
 ## How it matches the panel
 

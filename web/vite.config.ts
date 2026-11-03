@@ -1,9 +1,11 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  // Relative asset URLs: the site is served at a domain root and also
-  // proxied under a subpath (trevorohare.com/spec-check/).
-  base: "./",
+  // Public URL is https://www.trevorohare.com/spec-check (proxied to this
+  // Vercel project by a rewrite in trevorohare.com). That site strips
+  // trailing slashes, so asset URLs must be absolute under /spec-check/.
+  // web/vercel.json maps /spec-check/* back to the files on this project.
+  base: "/spec-check/",
   worker: { format: "es" },
   build: { outDir: "dist", target: "es2022" },
   test: {
