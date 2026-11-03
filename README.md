@@ -10,6 +10,10 @@
 CEP panel for Premiere Pro: measure a mix against a delivery spec (Audible/ACX,
 Apple Podcasts, Spotify, broadcast, custom) and show a pass/fail scoreboard.
 
+No Premiere? Check a WAV or MP3 in your browser at
+[trevorohare.com/spec-check](https://www.trevorohare.com/spec-check). The file
+stays on your computer. Source in [`web/`](web/).
+
 ## Install (users)
 
 Download the signed `.zxp` from the
