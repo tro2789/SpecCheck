@@ -1,0 +1,25 @@
+{
+  "name": "spec-check-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Browser version of Spec Check: measure an audio file against a delivery spec without uploading it.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "fixtures": "node scripts/make-fixtures.mjs"
+  },
+  "dependencies": {
+    "mpg123-decoder": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
+  }
+}

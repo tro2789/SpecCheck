@@ -1,0 +1,176 @@
+{
+  "ffmpeg": "ffmpeg version 7.1.5-0+deb13u1 Copyright (c) 2000-2026 the FFmpeg developers",
+  "fixtures": [
+    {
+      "file": "sine-1k-stereo-48k-s16.wav",
+      "metrics": {
+        "duration": 3.5,
+        "sampleRateHz": 48000,
+        "channels": 2,
+        "codec": "pcm_s16le",
+        "bitrateKbps": 1536,
+        "lufsI": -23,
+        "lra": 0,
+        "truePeak": -23,
+        "minMomentary": -23,
+        "rmsDb": -26.010308,
+        "samplePeakDb": -22.998974,
+        "headSilence": 0,
+        "tailSilence": 0,
+        "noiseFloor": -26.010308
+      }
+    },
+    {
+      "file": "speech-mono-44k-s16.wav",
+      "metrics": {
+        "duration": 10,
+        "sampleRateHz": 44100,
+        "channels": 1,
+        "codec": "pcm_s16le",
+        "bitrateKbps": 706,
+        "lufsI": -28.6,
+        "lra": 5.1,
+        "truePeak": -16.1,
+        "minMomentary": -66.9,
+        "rmsDb": -30.024755,
+        "samplePeakDb": -16.054056,
+        "headSilence": 0,
+        "tailSilence": 0,
+        "noiseFloor": -50.984532
+      }
+    },
+    {
+      "file": "speech-mono-44k-cbr192.mp3",
+      "metrics": {
+        "duration": 10.03102,
+        "sampleRateHz": 44100,
+        "channels": 1,
+        "codec": "mp3",
+        "bitrateKbps": 192,
+        "lufsI": -28.9,
+        "lra": 5.1,
+        "truePeak": -16.3,
+        "minMomentary": -67.1,
+        "rmsDb": -30.305128,
+        "samplePeakDb": -16.317704,
+        "headSilence": 0,
+        "tailSilence": 0,
+        "noiseFloor": -51.249809
+      }
+    },
+    {
+      "file": "roomtone-mono-48k-s24.wav",
+      "metrics": {
+        "duration": 6.3,
+        "sampleRateHz": 48000,
+        "channels": 1,
+        "codec": "pcm_s24le",
+        "bitrateKbps": 1152,
+        "lufsI": -28.5,
+        "lra": 3.5,
+        "truePeak": -16.5,
+        "minMomentary": -61.9,
+        "rmsDb": -32.130003,
+        "samplePeakDb": -17.73139,
+        "headSilence": 2.000104,
+        "tailSilence": 1.7190829999999995,
+        "noiseFloor": -67.176621
+      }
+    },
+    {
+      "file": "roomtone-stereo-48k-vbr.mp3",
+      "metrics": {
+        "duration": 6.744,
+        "sampleRateHz": 48000,
+        "channels": 2,
+        "codec": "mp3",
+        "bitrateKbps": 211,
+        "lufsI": -24.8,
+        "lra": 3.6,
+        "truePeak": -14.5,
+        "minMomentary": -59.9,
+        "rmsDb": -31.505453,
+        "samplePeakDb": -14.501073,
+        "headSilence": 0,
+        "tailSilence": 0,
+        "noiseFloor": -69.834998
+      }
+    },
+    {
+      "file": "isp-mono-44k-f32.wav",
+      "metrics": {
+        "duration": 2,
+        "sampleRateHz": 44100,
+        "channels": 1,
+        "codec": "pcm_f32le",
+        "bitrateKbps": 1411,
+        "lufsI": -0.6,
+        "lra": 0,
+        "truePeak": -0.3,
+        "minMomentary": -0.6,
+        "rmsDb": -3.92545,
+        "samplePeakDb": -3.92545,
+        "headSilence": 0,
+        "tailSilence": 0,
+        "noiseFloor": -3.92545
+      }
+    },
+    {
+      "file": "silence-mono-48k-s16.wav",
+      "metrics": {
+        "duration": 1,
+        "sampleRateHz": 48000,
+        "channels": 1,
+        "codec": "pcm_s16le",
+        "bitrateKbps": 768,
+        "lufsI": -70,
+        "lra": 0,
+        "truePeak": null,
+        "minMomentary": null,
+        "rmsDb": null,
+        "samplePeakDb": null,
+        "headSilence": 1,
+        "tailSilence": 1,
+        "noiseFloor": null
+      }
+    },
+    {
+      "file": "speech-stereo-16k-s32.wav",
+      "metrics": {
+        "duration": 3,
+        "sampleRateHz": 16000,
+        "channels": 2,
+        "codec": "pcm_s32le",
+        "bitrateKbps": 1024,
+        "lufsI": -22.7,
+        "lra": 20,
+        "truePeak": -13.1,
+        "minMomentary": -24.5,
+        "rmsDb": -26.020485,
+        "samplePeakDb": -15.518258,
+        "headSilence": 0,
+        "tailSilence": 0,
+        "noiseFloor": -27.873754
+      }
+    },
+    {
+      "file": "speech-mono-16k-f64.wav",
+      "metrics": {
+        "duration": 3,
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "codec": "pcm_f64le",
+        "bitrateKbps": 1024,
+        "lufsI": -34.4,
+        "lra": 20,
+        "truePeak": -22.8,
+        "minMomentary": -73.6,
+        "rmsDb": -35.165486,
+        "samplePeakDb": -24.519679,
+        "headSilence": 0,
+        "tailSilence": 0,
+        "noiseFloor": -39.721917
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spec Check: audio loudness checker for ACX, podcasts, and broadcast</title>
+  <meta name="description" content="Check an audio file against ACX, Apple Podcasts, Spotify, YouTube, and broadcast loudness specs. Your file stays on your computer.">
+  <!-- TODO(canonical-url): add <link rel="canonical" href="..."> and
+       <meta property="og:url" content="..."> once the public URL is chosen.
+       The same build is served at https://spec.trevorohare.dev/ and proxied
+       at https://trevorohare.com/spec-check/. -->
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#232323">
+</head>
+<body>
+  <main class="page">
+    <h1>Spec Check</h1>
+    <p class="lede">Check an audio file against ACX, Apple Podcasts, Spotify, YouTube, and broadcast loudness specs.</p>
+
+    <div class="drop" id="drop">
+      <p class="drop-text">Drop a WAV or MP3 here</p>
+      <button type="button" class="primary" id="choose">Choose a file</button>
+      <input type="file" id="file" accept=".wav,.mp3,audio/wav,audio/x-wav,audio/wave,audio/mpeg" hidden>
+    </div>
+    <p class="privacy">Your file stays on your computer. Nothing is uploaded.</p>
+
+    <div class="spec">
+      <label class="label" for="spec">Spec</label>
+      <select id="spec"></select>
+    </div>
+
+    <div class="progress" id="progress" hidden>
+      <p class="progress-text" id="progressText"></p>
+      <progress id="progressBar" max="100" value="0" aria-labelledby="progressText"></progress>
+    </div>
+    <div class="visually-hidden" role="status" aria-live="polite" id="announce"></div>
+    <p class="error" role="alert" id="error"></p>
+
+    <section class="results" id="results" aria-labelledby="verdict" hidden>
+      <p class="verdict" id="verdict"><span class="dot" aria-hidden="true"></span><span id="verdictText"></span></p>
+      <table>
+        <caption id="caption"></caption>
+        <thead>
+          <tr>
+            <th scope="col">Metric</th>
+            <th scope="col" class="num">Value</th>
+            <th scope="col" class="num">Target</th>
+            <th scope="col">Result</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    <ul>
+      <li><a href="https://trevorohare.com">Made by Trevor O'Hare</a></li>
+      <li><a href="https://trevorohare.com/podcast-editing">Podcast editing</a></li>
+      <li><a href="https://trevorohare.com/dev">Premiere Pro panel</a></li>
+      <li><a href="https://github.com/tro2789/SpecCheck">Source</a></li>
+    </ul>
+  </footer>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
