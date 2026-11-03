@@ -139,7 +139,16 @@ function render(): void {
   const s = score(metrics, checks);
 
   const sentence = verdict(s, checks.length, name);
-  verdictText.textContent = sentence;
+  // Keep the spec name on one line ("ACX / Audible" must not split).
+  const at = sentence.lastIndexOf(name);
+  if (at >= 0) {
+    const n = document.createElement("span");
+    n.className = "nowrap";
+    n.textContent = name;
+    verdictText.replaceChildren(sentence.slice(0, at), n, sentence.slice(at + name.length));
+  } else {
+    verdictText.textContent = sentence;
+  }
   verdictEl.className = "verdict " + (s.pass ? "pass" : "fail");
 
   caption.textContent = current.name + " ";
@@ -156,7 +165,7 @@ function render(): void {
     if (!chk) tr.className = "unchecked";
 
     let label = def.label;
-    if (def.key === "noiseFloor" && v !== null && v !== undefined) label += " (quietest 0.5 s)";
+    if (def.key === "noiseFloor" && v !== null && v !== undefined) label += " (quietest\u00a00.5\u00a0s)";
     const th = cell("th", label);
     th.scope = "row";
     tr.appendChild(th);
@@ -165,6 +174,16 @@ function render(): void {
     const value = cell("td", "", "value num" + state);
     if (v === null || v === undefined) missing(value);
     else value.textContent = fmtVal(def, v);
+    if (chk) {
+      // Shown instead of the Target column on narrow screens.
+      const t = document.createElement("span");
+      t.className = "target-inline";
+      const sr = document.createElement("span");
+      sr.className = "visually-hidden";
+      sr.textContent = "Target ";
+      t.append(sr, chk.required);
+      value.appendChild(t);
+    }
     tr.appendChild(value);
 
     tr.appendChild(cell("td", chk ? chk.required : "", "target num"));

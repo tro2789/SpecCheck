@@ -49,6 +49,10 @@ h1 {
   letter-spacing: 0.01em;
 }
 
+/* No one-word lines: short blocks wrap into even lines. */
+.lede, .privacy, .verdict, caption { text-wrap: balance; }
+.nowrap { white-space: nowrap; }
+
 .lede {
   margin: 6px 0 28px;
   color: var(--dim);
@@ -208,6 +212,8 @@ th:last-child, td:last-child { padding-right: 0; }
 .num { text-align: right; white-space: nowrap; }
 td.value, td.target { font-family: var(--mono); }
 td.target { color: var(--dim); font-size: 13px; }
+/* Phone layout: the target moves under the value (see the 520px query). */
+.target-inline { display: none; }
 td.status { font-weight: 600; white-space: nowrap; }
 td.status.pass, td.value.pass { color: var(--pass); }
 td.status.fail, td.value.fail { color: var(--fail); }
@@ -262,7 +268,10 @@ footer a:hover { color: var(--text); }
   select { flex: 1; min-width: 0; }
   table { font-size: 13px; }
   tbody th { font-size: 13px; }
-  td.target { font-size: 12px; }
+  /* Four columns leave the label column too narrow for two-word labels, so
+     the Target column folds under the value. One copy is shown at a time. */
+  th.col-target, td.target { display: none; }
+  .target-inline { display: block; margin-top: 2px; font-size: 12px; color: var(--dim); }
   th, td { padding-left: 5px; padding-right: 5px; }
   footer ul { padding: 16px 16px 24px; }
 }
