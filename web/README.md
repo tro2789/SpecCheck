@@ -25,6 +25,9 @@ project's own `.vercel.app` URL works too. On Vercel the Root Directory is
 `web`; the ignored-build command skips deploys for commits that do not touch
 `web/`. `public/licenses.txt` carries the MP3 decoder's MIT and LGPL-2.1
 notices (linked from the footer); update it if the decoder changes.
+The inline script and style in `index.html` finish trevorohare.com's page
+transition (`SlateCut.tsx` there sets a `slate-arrive` sessionStorage flag
+before it loads this page); keep its color and timing in step with that file.
 
 ## How it matches the panel
 

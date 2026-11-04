@@ -12,6 +12,34 @@
   <meta property="og:description" content="Check an audio file against ACX, Apple Podcasts, Spotify, YouTube, and broadcast loudness specs. Your file stays on your computer.">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#232323">
+  <!-- Slate cut arrival: trevorohare.com wipes its red slab over the
+       screen, sets this flag, and does a full page load to here. Cover
+       the first paint with the same slab, hold a beat, then wipe it off,
+       with the timing of SlateCut.tsx on that site. -->
+  <script>
+    try {
+      if (sessionStorage.getItem("slate-arrive")) {
+        sessionStorage.removeItem("slate-arrive");
+        if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          document.documentElement.classList.add("slate-arrive");
+        }
+      }
+    } catch (e) {}
+  </script>
+  <style>
+    html.slate-arrive::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      background: oklch(55% 0.21 30);
+      pointer-events: none;
+      animation: slate-off 0.36s cubic-bezier(0.7, 0, 0.2, 1) 0.16s forwards;
+    }
+    @keyframes slate-off {
+      to { transform: translateX(101%); visibility: hidden; }
+    }
+  </style>
 </head>
 <body>
   <main class="page">
