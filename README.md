@@ -76,6 +76,14 @@ Restart Premiere, then **Window > Extensions > Spec Check**.
 extension dir. ffmpeg is version-pinned (8.1.2) and downloaded with user
 consent, not bundled in the `.zxp`.
 
+## Update check
+
+When the panel opens, it checks for a new version one time each day. It sends
+one request to the GitHub API (`api.github.com/repos/tro2789/SpecCheck/releases/latest`).
+GitHub can see your IP address. The panel sends no other data. If a new
+version is available, a notice shows at the top of the panel. Click the notice
+to open the download page. Click the x to hide the notice until the next version.
+
 ## Support
 
 Spec Check is free and stays free. If it saves you a delivery round-trip,
