@@ -110,12 +110,46 @@
     ]
   };
 
+  // Settings file under the roaming profile: { custom: {...}, ui: {...} }.
+  // CEP keeps localStorage in %TEMP%\cep_cache, keyed by host version, so Temp
+  // cleanup and every Premiere upgrade wipe it; it stays as a fallback and is
+  // migrated into the file once.
+  var settingsFile = (function () {
+    try {
+      var base = window.__adobe_cep__.getSystemPath("userData");
+      return base ? decodeURIComponent(String(base).replace(/^file:\/{2,3}/, "")) +
+        "/com.tohare.speccheck/state.json" : null;
+    } catch (e) { return null; }
+  })();
+  var settings = null;
+  try { settings = JSON.parse(fs.readFileSync(settingsFile, "utf8")); } catch (e) {}
+  var migrate = !settings;
+  if (!settings) settings = {};
+  function lsGet(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
+
+  function writeSettings(field, value, lsKey) {
+    settings[field] = value;
+    var json = JSON.stringify(value);
+    try { localStorage.setItem(lsKey, json); } catch (e) {}
+    if (!settingsFile) return;
+    try {
+      var dir = path.dirname(settingsFile);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(settingsFile + ".tmp", JSON.stringify(settings), "utf8");
+      fs.renameSync(settingsFile + ".tmp", settingsFile);
+    } catch (e) { log("Settings file not saved: " + e, "bad"); }
+  }
+
   var CUSTOM_KEY = "speccheck_custom_presets_v1";
-  var customPresets = {};
-  try { customPresets = JSON.parse(localStorage.getItem(CUSTOM_KEY)) || {}; } catch (e) {}
+  var STORE = "speccheck_state_v1";
+  if (migrate) {
+    if (lsGet(CUSTOM_KEY)) writeSettings("custom", lsGet(CUSTOM_KEY), CUSTOM_KEY);
+    if (lsGet(STORE)) writeSettings("ui", lsGet(STORE), STORE);
+  }
+  var customPresets = settings.custom || {};
 
   function saveCustom() {
-    localStorage.setItem(CUSTOM_KEY, JSON.stringify(customPresets));
+    writeSettings("custom", customPresets, CUSTOM_KEY);
   }
 
   function allPresets() {
@@ -696,16 +730,12 @@
 
   /* ---------- UI wiring ---------- */
 
-  var STORE = "speccheck_state_v1";
-
   function saveState() {
-    try {
-      localStorage.setItem(STORE, JSON.stringify({
-        preset: $("preset").value,
-        watchPath: $("watchPath").value,
-        showAll: showAll
-      }));
-    } catch (e) {}
+    writeSettings("ui", {
+      preset: $("preset").value,
+      watchPath: $("watchPath").value,
+      showAll: showAll
+    }, STORE);
   }
 
   function rebuildPresetSelect() {
@@ -736,8 +766,7 @@
     }
     rebuildPresetSelect();
     var sel = $("preset");
-    var saved = {};
-    try { saved = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) {}
+    var saved = settings.ui || {};
     if (saved.preset && allPresets()[saved.preset]) sel.value = saved.preset;
     if (saved.watchPath) $("watchPath").value = saved.watchPath;
     if (saved.showAll) showAll = true;
